@@ -32,7 +32,7 @@ from pypdf.generic import (
 )
 
 APP_NAME = "SmashPDF"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 PROJECT_URL = "https://github.com/dklicious/SmashPDF"
 COMPRESSION_PROFILES = {
     "none": {
@@ -72,6 +72,15 @@ class UnlockResult:
         if not self.source_size:
             return 0.0
         return max(0.0, (1 - self.output_size / self.source_size) * 100)
+
+
+def resource_path(relative_path: str) -> Path:
+    """Resolve a bundled resource in source and PyInstaller builds."""
+
+    application_root = Path(
+        getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)
+    )
+    return application_root / relative_path
 
 
 def _resolved(value):
@@ -470,6 +479,22 @@ def run_gui() -> int:
     root.geometry("740x690")
     root.minsize(680, 610)
 
+    app_logo = None
+    try:
+        app_logo = tk.PhotoImage(
+            file=str(resource_path("assets/smashpdf_logo_64.png"))
+        )
+        root.iconphoto(True, app_logo)
+    except tk.TclError as error:
+        print(f"Could not load the application logo: {error}", file=sys.stderr)
+        app_logo = None
+
+    if os.name == "nt":
+        try:
+            root.iconbitmap(default=str(resource_path("assets/smashpdf.ico")))
+        except tk.TclError as error:
+            print(f"Could not load the Windows icon: {error}", file=sys.stderr)
+
     style = ttk.Style(root)
     if "vista" in style.theme_names():
         style.theme_use("vista")
@@ -477,11 +502,15 @@ def run_gui() -> int:
     outer = ttk.Frame(root, padding=20)
     outer.pack(fill="both", expand=True)
 
+    header = ttk.Frame(outer)
+    header.pack(fill="x", anchor="w")
+    if app_logo is not None:
+        ttk.Label(header, image=app_logo).pack(side="left", padx=(0, 12))
     ttk.Label(
-        outer,
-        text="SmashPDF",
+        header,
+        text=APP_NAME,
         font=("Segoe UI", 20, "bold"),
-    ).pack(anchor="w")
+    ).pack(side="left")
     ttk.Label(
         outer,
         text=(
@@ -678,16 +707,18 @@ def run_gui() -> int:
     def show_about() -> None:
         about = tk.Toplevel(root)
         about.title(f"About {APP_NAME}")
-        about.geometry("390x240")
+        about.geometry("410x310")
         about.resizable(False, False)
         about.transient(root)
         about.grab_set()
 
+        if app_logo is not None:
+            ttk.Label(about, image=app_logo).pack(pady=(20, 2))
         ttk.Label(
             about,
             text=APP_NAME,
             font=("Segoe UI", 20, "bold"),
-        ).pack(pady=(24, 2))
+        ).pack(pady=((24 if app_logo is None else 2), 2))
         ttk.Label(
             about,
             text=f"Version {APP_VERSION}",

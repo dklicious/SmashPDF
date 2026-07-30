@@ -1,5 +1,9 @@
 # SmashPDF
 
+<p align="center">
+  <img src="assets/smashpdf_logo.png" alt="SmashPDF official logo" width="180">
+</p>
+
 A local-first Windows tool that creates unrestricted and optionally compressed
 copies of PDFs without changing the source files. Documents and passwords stay
 on your computer.
