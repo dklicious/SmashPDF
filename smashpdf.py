@@ -32,7 +32,7 @@ from pypdf.generic import (
 )
 
 APP_NAME = "SmashPDF"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 PROJECT_URL = "https://github.com/dklicious/SmashPDF"
 COMPRESSION_PROFILES = {
     "none": {
