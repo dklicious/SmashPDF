@@ -24,8 +24,22 @@ information. Acknowledgement should be sent within seven days.
 
 SmashPDF runs locally and does not upload PDFs, passwords, or document contents.
 Source files are never overwritten. Outputs are written through a temporary
-file, validated, and then moved into place.
+file, validated, and then published with atomic no-replace semantics unless the
+caller explicitly enables overwrite.
 
 SmashPDF does not bypass an unknown opening password. Removing a PDF's digital
 signature or certification controls invalidates cryptographic verification, so
 the original signed document should always be retained.
+
+## Release integrity
+
+Tagged releases require:
+
+- a timestamped SHA-256 Authenticode signature;
+- a published SHA-256 checksum;
+- a CycloneDX SBOM;
+- GitHub build-provenance and SBOM attestations; and
+- dependencies installed from hash-locked requirement files.
+
+Release tags are checked against the canonical application version before the
+executable is built.
