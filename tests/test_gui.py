@@ -56,6 +56,7 @@ def test_gui_constructs_processes_and_switches_language(
     real_tk = tk.Tk
     show_info = Mock()
     show_warning = Mock()
+    open_project = Mock(return_value=True)
 
     def hidden_tk():
         root = real_tk()
@@ -101,6 +102,15 @@ def test_gui_constructs_processes_and_switches_language(
         root.update_idletasks()
         for child in root.winfo_children():
             if isinstance(child, tk.Toplevel):
+                project_link = next(
+                    widget
+                    for widget in _descendants(child)
+                    if isinstance(widget, ttk.Label)
+                    and widget.cget("text") == smashpdf.PROJECT_URL
+                )
+                assert str(project_link.cget("cursor")) == "hand2"
+                project_link.event_generate("<Button-1>")
+                root.update()
                 about_sizes = {
                     _font_size(root, widget)
                     for widget in _descendants(child)
@@ -121,9 +131,11 @@ def test_gui_constructs_processes_and_switches_language(
     )
     monkeypatch.setattr(messagebox, "showinfo", show_info)
     monkeypatch.setattr(messagebox, "showwarning", show_warning)
+    monkeypatch.setattr(smashpdf.webbrowser, "open_new_tab", open_project)
 
     assert smashpdf.run_gui() == 0
     assert smashpdf.load_language_preference(settings) == "zh"
     assert len(PdfReader(tmp_path / "gui_unlocked.pdf").pages) == 1
     show_info.assert_called_once()
     show_warning.assert_not_called()
+    open_project.assert_called_once_with(smashpdf.PROJECT_URL)

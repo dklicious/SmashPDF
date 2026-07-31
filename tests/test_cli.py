@@ -60,3 +60,11 @@ def test_parser_rejects_unknown_compression() -> None:
 
     with pytest.raises(SystemExit):
         parser.parse_args(["document.pdf", "--compression", "destructive"])
+
+
+def test_parser_accepts_massive_compression() -> None:
+    args = build_parser().parse_args(
+        ["document.pdf", "--compression", "massive"],
+    )
+
+    assert args.compression == "massive"

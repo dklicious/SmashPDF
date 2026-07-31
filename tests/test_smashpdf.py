@@ -6,6 +6,7 @@ from string import Formatter
 from unittest.mock import patch
 
 import pytest
+from PIL import Image
 from pypdf import PdfReader, PdfWriter
 from pypdf.constants import UserAccessPermissions
 from pypdf.errors import PdfReadError
@@ -396,6 +397,24 @@ def test_lossless_compression_preserves_pages_and_text(tmp_path: Path) -> None:
     assert len(compressed.pages) == len(original.pages)
     assert compressed.pages[0].extract_text() == original.pages[0].extract_text()
     assert output.stat().st_size < source.stat().st_size
+
+
+def test_massive_compression_surpasses_sixty_percent_on_scanned_pdf(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "high-resolution-scan.pdf"
+    output = tmp_path / "massive.pdf"
+    scan = Image.effect_noise((2200, 3000), 100).convert("RGB")
+    scan.save(source, "PDF", resolution=300, quality=95)
+
+    result = unlock_pdf(source, output=output, compression="massive")
+
+    reader = PdfReader(output)
+    output_image = reader.pages[0].images[0].image
+    assert len(reader.pages) == 1
+    assert result.streams_optimized == 1
+    assert result.reduction_percent > 60
+    assert max(output_image.size) <= 1440
 
 
 def test_preserves_metadata_and_attachments(tmp_path: Path) -> None:

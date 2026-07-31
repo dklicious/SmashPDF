@@ -29,19 +29,24 @@ language.
 Processing options:
 
 - **Unlock only** keeps the original image quality.
-- Tick **Compress PDF after unlocking (keeps original quality)** to enable it.
+- Tick **Compress PDF after unlocking** to enable it.
 - **Standard compression** usually makes suitable PDFs 5-30% smaller.
 - **Maximum compression** usually makes suitable PDFs 10-40% smaller.
+- **Massive compression** targets 60%+ reduction on image-heavy or scanned PDFs.
 
-Compression does not resize or recompress images, rasterise pages, remove text,
-or alter page geometry. Actual reduction depends on the PDF, and the app shows
-the exact saving after processing.
+Standard and Maximum compression are lossless: they do not resize or recompress
+images, rasterise pages, remove text, or alter page geometry. Massive compression
+downsamples and recompresses large embedded images, so image quality may be
+reduced while text and page structure remain intact. A 60% reduction cannot be
+guaranteed for text-only or already-optimised PDFs. The app shows the exact
+saving after processing.
 
 Example:
 
 `Contract.pdf` becomes `Contract_unlocked.pdf`,
 `Contract_unlocked_compressed.pdf`, or
-`Contract_unlocked_major_compressed.pdf`.
+`Contract_unlocked_major_compressed.pdf`, or
+`Contract_unlocked_massive_compressed.pdf`.
 
 If that name already exists, the tool creates `Contract_unlocked (2).pdf`.
 
@@ -96,6 +101,7 @@ python smashpdf.py "C:\path\protected.pdf" --password "opening-password"
 python smashpdf.py "C:\path\document.pdf" --output "C:\path\copy.pdf"
 python smashpdf.py "C:\path\document.pdf" --compression standard
 python smashpdf.py "C:\path\document.pdf" --compression major
+python smashpdf.py "C:\path\document.pdf" --compression massive
 ```
 
 Use `python smashpdf.py --help` for all options.
