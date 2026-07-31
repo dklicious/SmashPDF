@@ -5,6 +5,7 @@ import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+from tkinter import font as tkfont
 from unittest.mock import Mock
 
 import pytest
@@ -22,6 +23,24 @@ def _descendants(widget):
     for child in widget.winfo_children():
         yield child
         yield from _descendants(child)
+
+
+def _font_size(root, widget) -> int:
+    return int(tkfont.Font(root=root, font=widget.cget("font")).actual("size"))
+
+
+def test_named_fonts_are_two_sizes_larger() -> None:
+    root = tk.Tk()
+    root.withdraw()
+    positive = tkfont.Font(root=root, name="SmashPDFPositive", size=10)
+    negative = tkfont.Font(root=root, name="SmashPDFNegative", size=-10)
+
+    try:
+        smashpdf._increase_named_font_sizes(root)
+        assert int(positive.cget("size")) == 12
+        assert int(negative.cget("size")) == -12
+    finally:
+        root.destroy()
 
 
 def test_gui_constructs_processes_and_switches_language(
@@ -46,6 +65,18 @@ def test_gui_constructs_processes_and_switches_language(
     def exercise_interface(root, _n=0):
         root.update_idletasks()
         widgets = list(_descendants(root))
+        app_heading = next(
+            widget
+            for widget in widgets
+            if isinstance(widget, ttk.Label)
+            and widget.cget("text") == smashpdf.APP_NAME
+        )
+        drop_zone = next(widget for widget in widgets if isinstance(widget, tk.Label))
+        log = next(widget for widget in widgets if isinstance(widget, tk.Text))
+        assert _font_size(root, app_heading) == 22
+        assert _font_size(root, drop_zone) == 14
+        assert _font_size(root, log) == 11
+
         selector = next(
             widget for widget in widgets if isinstance(widget, ttk.Combobox)
         )
@@ -70,6 +101,12 @@ def test_gui_constructs_processes_and_switches_language(
         root.update_idletasks()
         for child in root.winfo_children():
             if isinstance(child, tk.Toplevel):
+                about_sizes = {
+                    _font_size(root, widget)
+                    for widget in _descendants(child)
+                    if isinstance(widget, ttk.Label) and widget.cget("font")
+                }
+                assert {12, 13, 22}.issubset(about_sizes)
                 child.destroy()
         root.destroy()
 

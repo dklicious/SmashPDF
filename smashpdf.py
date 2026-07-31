@@ -884,6 +884,20 @@ def _format_result(result: UnlockResult) -> str:
     )
 
 
+def _increase_named_font_sizes(root, increase: int = 2) -> None:
+    """Increase every Tk named font while preserving its family and styling."""
+    from tkinter import font as tkfont
+
+    for font_name in tkfont.names(root=root):
+        named_font = tkfont.nametofont(font_name, root=root)
+        current_size = int(named_font.cget("size"))
+        if current_size > 0:
+            named_font.configure(size=current_size + increase)
+        elif current_size < 0:
+            # Negative Tk font sizes are pixels, so a larger magnitude is larger.
+            named_font.configure(size=current_size - increase)
+
+
 def run_gui() -> int:
     import tkinter as tk
     from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -899,8 +913,8 @@ def run_gui() -> int:
         drag_and_drop_available = False
 
     root.title(APP_NAME)
-    root.geometry("780x720")
-    root.minsize(720, 640)
+    root.geometry("840x780")
+    root.minsize(780, 700)
 
     app_logo = None
     try:
@@ -919,6 +933,7 @@ def run_gui() -> int:
     style = ttk.Style(root)
     if "vista" in style.theme_names():
         style.theme_use("vista")
+    _increase_named_font_sizes(root)
 
     preferred_language = load_language_preference()
     language_code = tk.StringVar(value=preferred_language)
@@ -951,13 +966,13 @@ def run_gui() -> int:
     ttk.Label(
         header,
         text=APP_NAME,
-        font=("Segoe UI", 20, "bold"),
+        font=("Segoe UI", 22, "bold"),
     ).pack(side="left")
 
     intro_label = ttk.Label(
         outer,
         text=tr("intro"),
-        wraplength=700,
+        wraplength=760,
     )
     intro_label.pack(anchor="w", pady=(4, 14))
 
@@ -965,7 +980,7 @@ def run_gui() -> int:
         outer,
         text=tr("warning"),
         foreground="#9A4D00",
-        wraplength=700,
+        wraplength=760,
     )
     warning_label.pack(anchor="w", pady=(0, 14))
 
@@ -1008,7 +1023,7 @@ def run_gui() -> int:
         options,
         text=tr("no_quality_removed"),
         foreground="#555555",
-        wraplength=670,
+        wraplength=730,
     )
     quality_label.pack(anchor="w", pady=(5, 0))
 
@@ -1018,7 +1033,7 @@ def run_gui() -> int:
     drop_zone = tk.Label(
         outer,
         text=current_drop_text(),
-        font=("Segoe UI", 12, "bold"),
+        font=("Segoe UI", 14, "bold"),
         foreground="#1F4E79",
         background="#F2F7FC",
         relief="groove",
@@ -1032,7 +1047,7 @@ def run_gui() -> int:
         outer,
         height=9,
         wrap="word",
-        font=("Consolas", 9),
+        font=("Consolas", 11),
         state="disabled",
     )
     log.pack(fill="both", expand=True)
@@ -1180,7 +1195,7 @@ def run_gui() -> int:
     def show_about() -> None:
         about = tk.Toplevel(root)
         about.title(f"{tr('about')} {APP_NAME}")
-        about.geometry("410x310")
+        about.geometry("440x340")
         about.resizable(False, False)
         about.transient(root)
         about.grab_set()
@@ -1190,7 +1205,7 @@ def run_gui() -> int:
         ttk.Label(
             about,
             text=APP_NAME,
-            font=("Segoe UI", 20, "bold"),
+            font=("Segoe UI", 22, "bold"),
         ).pack(pady=((24 if app_logo is None else 2), 2))
         ttk.Label(
             about,
@@ -1200,12 +1215,12 @@ def run_gui() -> int:
         ttk.Label(
             about,
             text=tr("thank_you"),
-            font=("Segoe UI", 11),
+            font=("Segoe UI", 13),
         ).pack(pady=(20, 4))
         ttk.Label(
             about,
             text=tr("made_by"),
-            font=("Segoe UI", 10, "bold"),
+            font=("Segoe UI", 12, "bold"),
         ).pack()
         ttk.Label(
             about,

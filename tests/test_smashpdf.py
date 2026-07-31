@@ -47,7 +47,7 @@ def _blank_pdf(path: Path) -> None:
 
 
 def test_app_uses_canonical_version() -> None:
-    assert APP_VERSION == __version__ == "1.2.3"
+    assert __version__ == APP_VERSION
 
 
 def test_all_supported_languages_have_complete_translations() -> None:

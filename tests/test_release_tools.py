@@ -4,15 +4,16 @@ from pathlib import Path
 
 import pytest
 
+from _version import __version__
 from scripts.check_release_version import validate_release_tag
 from scripts.generate_version_info import numeric_version, render_version_info
 
 
 def test_release_tag_must_match_canonical_version() -> None:
-    validate_release_tag("v1.2.3")
+    validate_release_tag(f"v{__version__}")
 
     with pytest.raises(ValueError, match="does not match"):
-        validate_release_tag("v1.2.2")
+        validate_release_tag("v0.0.0")
 
 
 @pytest.mark.parametrize(
@@ -42,9 +43,10 @@ def test_invalid_windows_versions_are_rejected(version: str) -> None:
 
 def test_generated_windows_metadata_contains_version_and_brand() -> None:
     metadata = render_version_info()
+    version_tuple = numeric_version(__version__)
 
-    assert "filevers=(1, 2, 3, 0)" in metadata
-    assert "StringStruct('FileVersion', '1.2.3')" in metadata
+    assert f"filevers={version_tuple}" in metadata
+    assert f"StringStruct('FileVersion', '{__version__}')" in metadata
     assert "StringStruct('ProductName', 'SmashPDF')" in metadata
     assert "StringStruct('OriginalFilename', 'SmashPDF.exe')" in metadata
 
