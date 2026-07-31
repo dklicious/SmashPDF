@@ -18,7 +18,7 @@ connection is required.
 Choose a processing option, then drag one or more PDFs into the drop box. You
 can also click the box to browse. Each result is saved beside its source.
 Use the language selector to switch the interface instantly between English,
-Chinese, Spanish, Japanese, and Korean.
+Simplified Chinese, Traditional Chinese, Spanish, Japanese, and Korean.
 
 Processing options:
 
