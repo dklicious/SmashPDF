@@ -16,9 +16,11 @@ import os
 import sys
 import tempfile
 import traceback
+import webbrowser
 import zlib
 from collections.abc import Iterable
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
@@ -49,21 +51,24 @@ TRANSLATIONS = {
     "en": {
         "language": "Language",
         "intro": (
-            "Drop PDF files below to unlock them. Optionally compress them "
-            "without reducing quality. Original files are never changed."
+            "Drop PDF files below to unlock them. Optionally compress them. "
+            "Original files are never changed."
         ),
         "warning": (
             "Digital-signature verification will be removed from unlocked "
             "copies. Visible signature appearances are retained."
         ),
         "processing_option": "Processing option",
-        "compress_after_unlocking": (
-            "Compress PDF after unlocking (keeps original quality)"
-        ),
+        "compress_after_unlocking": "Compress PDF after unlocking",
         "standard_compression": "Standard compression - usually 5-30% smaller",
         "maximum_compression": "Maximum compression - usually 10-40% smaller",
+        "massive_compression": "Massive compression - targets 60%+ smaller",
         "no_quality_removed": (
             "No quality is removed. The exact saving is shown after processing."
+        ),
+        "massive_quality_warning": (
+            "Massive mode reduces embedded-image resolution and quality. Text and "
+            "page structure stay intact. 60%+ is a target, not a guarantee."
         ),
         "drop_files": "DROP PDF FILES HERE\n\nor click this box to browse",
         "choose_files": "CLICK HERE TO CHOOSE PDF FILES",
@@ -97,6 +102,7 @@ TRANSLATIONS = {
             "standard lossless compression; {count} stream(s) optimized"
         ),
         "maximum_result": ("maximum lossless compression; {count} stream(s) optimized"),
+        "massive_result": ("massive image compression; {count} image(s) recompressed"),
         "result_summary": (
             "Created: {output}\nPages: {pages}; {changes}\n"
             "Size: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
@@ -104,16 +110,18 @@ TRANSLATIONS = {
     },
     "zh": {
         "language": "语言",
-        "intro": (
-            "将 PDF 文件拖放到下方以解除限制。可选择在不降低质量的情况下压缩。"
-            "原始文件不会被更改。"
-        ),
+        "intro": ("将 PDF 文件拖放到下方以解除限制。可选择压缩。原始文件不会被更改。"),
         "warning": ("解锁后的副本将移除数字签名验证。可见的签名外观会保留。"),
         "processing_option": "处理选项",
-        "compress_after_unlocking": "解锁后压缩 PDF（保持原始质量）",
+        "compress_after_unlocking": "解锁后压缩 PDF",
         "standard_compression": "标准压缩 — 通常缩小 5–30%",
         "maximum_compression": "最大压缩 — 通常缩小 10–40%",
+        "massive_compression": "超强压缩 — 目标缩小 60% 以上",
         "no_quality_removed": "不会降低质量。处理后会显示实际节省的空间。",
+        "massive_quality_warning": (
+            "超强模式会降低嵌入图像的分辨率和质量。文本和页面结构保持不变。"
+            "缩小 60% 以上是目标，并非保证。"
+        ),
         "drop_files": "将 PDF 文件拖放到这里\n\n或单击此框浏览文件",
         "choose_files": "单击此处选择 PDF 文件",
         "processing_files": "正在处理 {count} 个 PDF 文件...",
@@ -144,6 +152,7 @@ TRANSLATIONS = {
         "unrestricted_copy_created": "已创建无限制副本",
         "standard_result": "标准无损压缩；已优化 {count} 个数据流",
         "maximum_result": "最大无损压缩；已优化 {count} 个数据流",
+        "massive_result": "超强图像压缩；已重新压缩 {count} 张图像",
         "result_summary": (
             "已创建：{output}\n页数：{pages}；{changes}\n"
             "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
@@ -151,16 +160,18 @@ TRANSLATIONS = {
     },
     "zh_hant": {
         "language": "語言",
-        "intro": (
-            "將 PDF 檔案拖放到下方以解除限制。可選擇在不降低品質的情況下壓縮。"
-            "原始檔案不會被變更。"
-        ),
+        "intro": ("將 PDF 檔案拖放到下方以解除限制。可選擇壓縮。原始檔案不會被變更。"),
         "warning": ("解鎖後的副本將移除數位簽章驗證。可見的簽章外觀會保留。"),
         "processing_option": "處理選項",
-        "compress_after_unlocking": "解鎖後壓縮 PDF（保持原始品質）",
+        "compress_after_unlocking": "解鎖後壓縮 PDF",
         "standard_compression": "標準壓縮 — 通常縮小 5–30%",
         "maximum_compression": "最大壓縮 — 通常縮小 10–40%",
+        "massive_compression": "超強壓縮 — 目標縮小 60% 以上",
         "no_quality_removed": "不會降低品質。處理後會顯示實際節省的空間。",
+        "massive_quality_warning": (
+            "超強模式會降低嵌入影像的解析度和品質。文字和頁面結構保持不變。"
+            "縮小 60% 以上是目標，並非保證。"
+        ),
         "drop_files": "將 PDF 檔案拖放到這裡\n\n或按一下此方塊瀏覽檔案",
         "choose_files": "按一下此處選擇 PDF 檔案",
         "processing_files": "正在處理 {count} 個 PDF 檔案...",
@@ -191,6 +202,7 @@ TRANSLATIONS = {
         "unrestricted_copy_created": "已建立無限制副本",
         "standard_result": "標準無損壓縮；已最佳化 {count} 個資料流",
         "maximum_result": "最大無損壓縮；已最佳化 {count} 個資料流",
+        "massive_result": "超強影像壓縮；已重新壓縮 {count} 張影像",
         "result_summary": (
             "已建立：{output}\n頁數：{pages}；{changes}\n"
             "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
@@ -200,20 +212,24 @@ TRANSLATIONS = {
         "language": "Idioma",
         "intro": (
             "Arrastra archivos PDF abajo para desbloquearlos. También puedes "
-            "comprimirlos sin reducir la calidad. Los originales no se modifican."
+            "comprimirlos. Los originales no se modifican."
         ),
         "warning": (
             "La verificación de firmas digitales se eliminará de las copias "
             "desbloqueadas. La apariencia visible de las firmas se conserva."
         ),
         "processing_option": "Opción de procesamiento",
-        "compress_after_unlocking": (
-            "Comprimir el PDF después de desbloquearlo (mantiene la calidad)"
-        ),
+        "compress_after_unlocking": "Comprimir el PDF después de desbloquearlo",
         "standard_compression": ("Compresión estándar - normalmente 5-30% más pequeño"),
         "maximum_compression": ("Compresión máxima - normalmente 10-40% más pequeño"),
+        "massive_compression": ("Compresión masiva - objetivo: más de 60% más pequeño"),
         "no_quality_removed": (
             "No se reduce la calidad. El ahorro exacto se muestra al terminar."
+        ),
+        "massive_quality_warning": (
+            "El modo masivo reduce la resolución y la calidad de las imágenes "
+            "incrustadas. El texto y la estructura de las páginas se conservan. "
+            "Más del 60% es un objetivo, no una garantía."
         ),
         "drop_files": (
             "ARRASTRA LOS ARCHIVOS PDF AQUÍ\n\no haz clic en este cuadro para buscarlos"
@@ -254,6 +270,9 @@ TRANSLATIONS = {
         "maximum_result": (
             "compresión máxima sin pérdida; {count} flujo(s) optimizado(s)"
         ),
+        "massive_result": (
+            "compresión masiva de imágenes; {count} imagen(es) recomprimida(s)"
+        ),
         "result_summary": (
             "Creado: {output}\nPáginas: {pages}; {changes}\n"
             "Tamaño: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
@@ -262,18 +281,23 @@ TRANSLATIONS = {
     "ja": {
         "language": "言語",
         "intro": (
-            "PDF ファイルを下にドロップして制限を解除します。品質を落とさずに"
-            "圧縮することもできます。元のファイルは変更されません。"
+            "PDF ファイルを下にドロップして制限を解除します。圧縮することもできます。"
+            "元のファイルは変更されません。"
         ),
         "warning": (
             "解除後のコピーではデジタル署名の検証が削除されます。"
             "表示されている署名の外観は保持されます。"
         ),
         "processing_option": "処理オプション",
-        "compress_after_unlocking": "解除後に PDF を圧縮（元の品質を保持）",
+        "compress_after_unlocking": "解除後に PDF を圧縮",
         "standard_compression": "標準圧縮 — 通常 5～30% 小さくなります",
         "maximum_compression": "最大圧縮 — 通常 10～40% 小さくなります",
+        "massive_compression": "超強力圧縮 — 60%以上の縮小を目標",
         "no_quality_removed": "品質は低下しません。処理後に正確な削減量を表示します。",
+        "massive_quality_warning": (
+            "超強力モードでは埋め込み画像の解像度と品質が低下します。"
+            "テキストとページ構造は保持されます。60%以上は目標であり、保証ではありません。"
+        ),
         "drop_files": (
             "ここに PDF ファイルをドロップ\n\nまたは、このボックスをクリックして参照"
         ),
@@ -309,6 +333,7 @@ TRANSLATIONS = {
         "unrestricted_copy_created": "制限のないコピーを作成",
         "standard_result": "標準ロスレス圧縮；{count} ストリームを最適化",
         "maximum_result": "最大ロスレス圧縮；{count} ストリームを最適化",
+        "massive_result": "超強力画像圧縮；{count} 個の画像を再圧縮",
         "result_summary": (
             "作成先：{output}\nページ数：{pages}；{changes}\n"
             "サイズ：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
@@ -317,19 +342,24 @@ TRANSLATIONS = {
     "ko": {
         "language": "언어",
         "intro": (
-            "PDF 파일을 아래에 놓아 제한을 해제하세요. 품질 저하 없이 압축할 수도 "
-            "있습니다. 원본 파일은 변경되지 않습니다."
+            "PDF 파일을 아래에 놓아 제한을 해제하세요. 압축할 수도 있습니다. "
+            "원본 파일은 변경되지 않습니다."
         ),
         "warning": (
             "제한이 해제된 사본에서는 디지털 서명 검증이 제거됩니다. "
             "화면에 보이는 서명 모양은 유지됩니다."
         ),
         "processing_option": "처리 옵션",
-        "compress_after_unlocking": "제한 해제 후 PDF 압축(원본 품질 유지)",
+        "compress_after_unlocking": "제한 해제 후 PDF 압축",
         "standard_compression": "표준 압축 — 일반적으로 5~30% 축소",
         "maximum_compression": "최대 압축 — 일반적으로 10~40% 축소",
+        "massive_compression": "초강력 압축 — 60% 이상 축소 목표",
         "no_quality_removed": (
             "품질은 저하되지 않습니다. 처리 후 정확한 절감량을 표시합니다."
+        ),
+        "massive_quality_warning": (
+            "초강력 모드는 포함된 이미지의 해상도와 품질을 낮춥니다. 텍스트와 "
+            "페이지 구조는 유지됩니다. 60% 이상은 목표이며 보장되지 않습니다."
         ),
         "drop_files": (
             "PDF 파일을 여기에 놓으세요\n\n또는 이 상자를 클릭하여 찾아보기"
@@ -365,6 +395,7 @@ TRANSLATIONS = {
         "unrestricted_copy_created": "제한 없는 사본 생성됨",
         "standard_result": "표준 무손실 압축; 스트림 {count}개 최적화됨",
         "maximum_result": "최대 무손실 압축; 스트림 {count}개 최적화됨",
+        "massive_result": "초강력 이미지 압축; 이미지 {count}개 재압축됨",
         "result_summary": (
             "생성됨: {output}\n페이지: {pages}; {changes}\n"
             "크기: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
@@ -383,6 +414,10 @@ COMPRESSION_PROFILES = {
     "major": {
         "label": "Maximum lossless compression",
         "suffix": "_unlocked_major_compressed",
+    },
+    "massive": {
+        "label": "Massive image compression",
+        "suffix": "_unlocked_massive_compressed",
     },
 }
 
@@ -713,7 +748,7 @@ def _losslessly_recompress_streams(writer: PdfWriter, mode: str) -> int:
         if _compress_page_content(page):
             optimized += 1
 
-    if mode != "major":
+    if mode not in {"major", "massive"}:
         return optimized
 
     # Maximum mode performs a second lossless pass over eligible streams.
@@ -753,6 +788,90 @@ def _losslessly_recompress_streams(writer: PdfWriter, mode: str) -> int:
         optimized += 1
 
     return optimized
+
+
+def _massively_recompress_images(writer: PdfWriter) -> int:
+    """Downsample and recompress large embedded images for maximum size savings."""
+    from PIL import Image, UnidentifiedImageError
+
+    max_dimension = 1440
+    jpeg_quality = 28
+    recompressed = 0
+    processed_references: set[tuple[int, int]] = set()
+
+    for page in writer.pages:
+        try:
+            page_images = list(page.images)
+        except (ImportError, PdfReadError, TypeError, ValueError):
+            continue
+
+        for image_file in page_images:
+            reference = image_file.indirect_reference
+            if reference is None:
+                # pypdf cannot safely replace inline images.
+                continue
+
+            reference_key = (reference.idnum, reference.generation)
+            if reference_key in processed_references:
+                continue
+            processed_references.add(reference_key)
+
+            try:
+                original_image = image_file.image
+                if (
+                    original_image is None
+                    or original_image.width * original_image.height < 65_536
+                ):
+                    continue
+
+                candidate = original_image.copy()
+                candidate.load()
+                if max(candidate.size) > max_dimension:
+                    candidate.thumbnail(
+                        (max_dimension, max_dimension),
+                        Image.Resampling.LANCZOS,
+                    )
+
+                if candidate.mode in {"RGBA", "LA"} or (
+                    candidate.mode == "P" and "transparency" in candidate.info
+                ):
+                    rgba = candidate.convert("RGBA")
+                    background = Image.new("RGB", rgba.size, "white")
+                    background.paste(rgba, mask=rgba.getchannel("A"))
+                    candidate = background
+                elif candidate.mode != "RGB":
+                    candidate = candidate.convert("RGB")
+
+                preview = BytesIO()
+                candidate.save(
+                    preview,
+                    "JPEG",
+                    quality=jpeg_quality,
+                    optimize=True,
+                    progressive=True,
+                )
+                original_size = len(image_file.data)
+                if original_size and preview.tell() >= original_size:
+                    continue
+
+                image_file.replace(
+                    candidate,
+                    quality=jpeg_quality,
+                    optimize=True,
+                    progressive=True,
+                )
+                recompressed += 1
+            except (
+                Image.DecompressionBombError,
+                OSError,
+                PdfReadError,
+                TypeError,
+                UnidentifiedImageError,
+                ValueError,
+            ):
+                continue
+
+    return recompressed
 
 
 def _validate_output(output: Path, expected_pages: int) -> None:
@@ -811,6 +930,8 @@ def unlock_pdf(
     writer = PdfWriter(clone_from=reader)
     signature_fields, preserved_appearances = _remove_signature_controls(writer)
     streams_optimized = _losslessly_recompress_streams(writer, compression)
+    if compression == "massive":
+        streams_optimized = _massively_recompress_images(writer)
 
     # Remove detached cryptographic objects and duplicate resources.
     writer.compress_identical_objects(
@@ -896,6 +1017,11 @@ def _increase_named_font_sizes(root, increase: int = 2) -> None:
         elif current_size < 0:
             # Negative Tk font sizes are pixels, so a larger magnitude is larger.
             named_font.configure(size=current_size - increase)
+
+
+def _open_project_url(_event=None) -> bool:
+    """Open the public project page in the user's default browser."""
+    return webbrowser.open_new_tab(PROJECT_URL)
 
 
 def run_gui() -> int:
@@ -1002,6 +1128,7 @@ def run_gui() -> int:
         text=tr("standard_compression"),
         variable=compression_level,
         value="standard",
+        command=lambda: update_compression_controls(),
     )
     standard_radio.pack(anchor="w", padx=(22, 0), pady=2)
     major_radio = ttk.Radiobutton(
@@ -1009,15 +1136,17 @@ def run_gui() -> int:
         text=tr("maximum_compression"),
         variable=compression_level,
         value="major",
+        command=lambda: update_compression_controls(),
     )
     major_radio.pack(anchor="w", padx=(22, 0), pady=2)
-
-    def update_compression_controls() -> None:
-        state = "normal" if compression_enabled.get() else "disabled"
-        standard_radio.configure(state=state)
-        major_radio.configure(state=state)
-
-    update_compression_controls()
+    massive_radio = ttk.Radiobutton(
+        options,
+        text=tr("massive_compression"),
+        variable=compression_level,
+        value="massive",
+        command=lambda: update_compression_controls(),
+    )
+    massive_radio.pack(anchor="w", padx=(22, 0), pady=2)
 
     quality_label = ttk.Label(
         options,
@@ -1026,6 +1155,20 @@ def run_gui() -> int:
         wraplength=730,
     )
     quality_label.pack(anchor="w", pady=(5, 0))
+
+    def update_compression_controls() -> None:
+        state = "normal" if compression_enabled.get() else "disabled"
+        standard_radio.configure(state=state)
+        major_radio.configure(state=state)
+        massive_radio.configure(state=state)
+        warning_key = (
+            "massive_quality_warning"
+            if compression_enabled.get() and compression_level.get() == "massive"
+            else "no_quality_removed"
+        )
+        quality_label.configure(text=tr(warning_key))
+
+    update_compression_controls()
 
     def current_drop_text() -> str:
         return tr("drop_files") if drag_and_drop_available else tr("choose_files")
@@ -1079,6 +1222,8 @@ def run_gui() -> int:
             changes.append(tr("standard_result", count=result.streams_optimized))
         elif result.compression_mode == "major":
             changes.append(tr("maximum_result", count=result.streams_optimized))
+        elif result.compression_mode == "massive":
+            changes.append(tr("massive_result", count=result.streams_optimized))
 
         return tr(
             "result_summary",
@@ -1222,11 +1367,17 @@ def run_gui() -> int:
             text=tr("made_by"),
             font=("Segoe UI", 12, "bold"),
         ).pack()
-        ttk.Label(
+        project_link = ttk.Label(
             about,
             text=PROJECT_URL,
             foreground="#1F4E79",
-        ).pack(pady=(8, 14))
+            cursor="hand2",
+            font=("Segoe UI", 12, "underline"),
+            takefocus=True,
+        )
+        project_link.pack(pady=(8, 14))
+        project_link.bind("<Button-1>", _open_project_url)
+        project_link.bind("<Return>", _open_project_url)
         ttk.Button(about, text=tr("close"), command=about.destroy).pack()
 
         about.update_idletasks()
@@ -1271,7 +1422,8 @@ def run_gui() -> int:
         compression_check.configure(text=tr("compress_after_unlocking"))
         standard_radio.configure(text=tr("standard_compression"))
         major_radio.configure(text=tr("maximum_compression"))
-        quality_label.configure(text=tr("no_quality_removed"))
+        massive_radio.configure(text=tr("massive_compression"))
+        update_compression_controls()
         drop_zone.configure(text=current_drop_text())
         choose_button.configure(text=tr("browse_files"))
         about_button.configure(text=tr("about"))
@@ -1318,9 +1470,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--compression",
-        choices=("none", "standard", "major"),
+        choices=("none", "standard", "major", "massive"),
         default="none",
-        help=("Lossless compression: none, standard, or major"),
+        help=(
+            "Compression mode: none, standard or major (lossless), or massive "
+            "(lossy image compression)"
+        ),
     )
     parser.add_argument(
         "--gui",
