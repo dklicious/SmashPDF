@@ -22,6 +22,8 @@ from smashpdf import (
     LANGUAGE_NAMES,
     TRANSLATIONS,
     PasswordRequiredError,
+    load_language_preference,
+    save_language_preference,
     unlock_pdf,
 )
 
@@ -40,9 +42,9 @@ def test_all_supported_languages_have_complete_translations() -> None:
         "ko",
     }
     assert list(LANGUAGE_NAMES.values()) == [
-        "English",
         "简体中文",
         "繁體中文",
+        "English",
         "Español",
         "日本語",
         "한국어",
@@ -68,6 +70,28 @@ def test_all_supported_languages_have_complete_translations() -> None:
                 if field
             }
             assert actual_fields == expected_fields, (language, key)
+
+
+def test_language_preference_defaults_to_english_and_persists(
+    tmp_path: Path,
+) -> None:
+    settings = tmp_path / "preferences" / "settings.json"
+
+    assert load_language_preference(settings) == "en"
+
+    save_language_preference("zh_hant", settings)
+    assert load_language_preference(settings) == "zh_hant"
+    assert settings.read_text(encoding="utf-8") == (
+        '{"language":"zh_hant"}\n'
+    )
+
+    settings.write_text('{"language":"unsupported"}', encoding="utf-8")
+    assert load_language_preference(settings) == "en"
+
+
+def test_language_preference_rejects_unknown_language(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="Unsupported language"):
+        save_language_preference("unknown", tmp_path / "settings.json")
 
 
 def _encrypted_pdf(

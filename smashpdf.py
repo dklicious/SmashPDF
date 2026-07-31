@@ -11,6 +11,7 @@ while preserving page geometry, images, and selectable text.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import tempfile
@@ -32,12 +33,12 @@ from pypdf.generic import (
 )
 
 APP_NAME = "SmashPDF"
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.2.2"
 PROJECT_URL = "https://github.com/dklicious/SmashPDF"
 LANGUAGE_NAMES = {
-    "en": "English",
     "zh": "简体中文",
     "zh_hant": "繁體中文",
+    "en": "English",
     "es": "Español",
     "ja": "日本語",
     "ko": "한국어",
@@ -424,6 +425,66 @@ def resource_path(relative_path: str) -> Path:
         getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)
     )
     return application_root / relative_path
+
+
+def settings_path() -> Path:
+    """Return the per-user settings path without using the working directory."""
+
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    settings_root = (
+        Path(local_app_data)
+        if local_app_data
+        else Path.home() / ".config"
+    )
+    return settings_root / APP_NAME / "settings.json"
+
+
+def load_language_preference(path: str | Path | None = None) -> str:
+    """Load a valid saved language, defaulting to English on first launch."""
+
+    preference_path = Path(path) if path is not None else settings_path()
+    try:
+        payload = json.loads(preference_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return "en"
+
+    if not isinstance(payload, dict):
+        return "en"
+    language = payload.get("language")
+    return language if language in LANGUAGE_NAMES else "en"
+
+
+def save_language_preference(
+    language: str,
+    path: str | Path | None = None,
+) -> None:
+    """Atomically save the selected language without storing document data."""
+
+    if language not in LANGUAGE_NAMES:
+        raise ValueError(f"Unsupported language: {language}")
+
+    preference_path = Path(path) if path is not None else settings_path()
+    preference_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_fd, temp_name = tempfile.mkstemp(
+        prefix=".settings-",
+        suffix=".tmp",
+        dir=str(preference_path.parent),
+    )
+    temp_path = Path(temp_name)
+
+    try:
+        with os.fdopen(temp_fd, "w", encoding="utf-8", newline="\n") as stream:
+            json.dump(
+                {"language": language},
+                stream,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            stream.write("\n")
+        os.replace(temp_path, preference_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
 
 
 def _resolved(value):
@@ -842,8 +903,11 @@ def run_gui() -> int:
     if "vista" in style.theme_names():
         style.theme_use("vista")
 
-    language_code = tk.StringVar(value="en")
-    language_name = tk.StringVar(value=LANGUAGE_NAMES["en"])
+    preferred_language = load_language_preference()
+    language_code = tk.StringVar(value=preferred_language)
+    language_name = tk.StringVar(
+        value=LANGUAGE_NAMES[preferred_language]
+    )
 
     def tr(key: str, **values) -> str:
         return TRANSLATIONS[language_code.get()][key].format(**values)
@@ -1188,6 +1252,13 @@ def run_gui() -> int:
         choose_button.configure(text=tr("browse_files"))
         about_button.configure(text=tr("about"))
         close_button.configure(text=tr("close"))
+        try:
+            save_language_preference(selected_code)
+        except OSError as error:
+            print(
+                f"Could not save the language preference: {error}",
+                file=sys.stderr,
+            )
 
     language_selector.bind("<<ComboboxSelected>>", update_language)
     drop_zone.bind("<Button-1>", lambda _event: select_and_unlock())
