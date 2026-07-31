@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from string import Formatter
 
 import pytest
 from pypdf import PdfReader, PdfWriter
@@ -17,11 +18,41 @@ from pypdf.generic import (
     TextStringObject,
 )
 
-from smashpdf import PasswordRequiredError, unlock_pdf
+from smashpdf import (
+    LANGUAGE_NAMES,
+    TRANSLATIONS,
+    PasswordRequiredError,
+    unlock_pdf,
+)
 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_all_supported_languages_have_complete_translations() -> None:
+    assert set(LANGUAGE_NAMES) == {"en", "zh", "es", "ja", "ko"}
+    english_keys = set(TRANSLATIONS["en"])
+    formatter = Formatter()
+
+    assert set(TRANSLATIONS) == set(LANGUAGE_NAMES)
+    for language, translations in TRANSLATIONS.items():
+        assert set(translations) == english_keys, language
+        assert all(value.strip() for value in translations.values()), language
+        for key, value in translations.items():
+            expected_fields = {
+                field
+                for _, field, _, _ in formatter.parse(
+                    TRANSLATIONS["en"][key]
+                )
+                if field
+            }
+            actual_fields = {
+                field
+                for _, field, _, _ in formatter.parse(value)
+                if field
+            }
+            assert actual_fields == expected_fields, (language, key)
 
 
 def _encrypted_pdf(

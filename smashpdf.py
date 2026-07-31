@@ -32,8 +32,303 @@ from pypdf.generic import (
 )
 
 APP_NAME = "SmashPDF"
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.2.0"
 PROJECT_URL = "https://github.com/dklicious/SmashPDF"
+LANGUAGE_NAMES = {
+    "en": "English",
+    "zh": "中文",
+    "es": "Español",
+    "ja": "日本語",
+    "ko": "한국어",
+}
+TRANSLATIONS = {
+    "en": {
+        "language": "Language",
+        "intro": (
+            "Drop PDF files below to unlock them. Optionally compress them "
+            "without reducing quality. Original files are never changed."
+        ),
+        "warning": (
+            "Digital-signature verification will be removed from unlocked "
+            "copies. Visible signature appearances are retained."
+        ),
+        "processing_option": "Processing option",
+        "compress_after_unlocking": (
+            "Compress PDF after unlocking (keeps original quality)"
+        ),
+        "standard_compression": "Standard compression - usually 5-30% smaller",
+        "maximum_compression": "Maximum compression - usually 10-40% smaller",
+        "no_quality_removed": (
+            "No quality is removed. The exact saving is shown after processing."
+        ),
+        "drop_files": "DROP PDF FILES HERE\n\nor click this box to browse",
+        "choose_files": "CLICK HERE TO CHOOSE PDF FILES",
+        "processing_files": "PROCESSING {count} PDF FILE(S)...",
+        "browse_files": "Browse PDF Files",
+        "close": "Close",
+        "about": "About",
+        "select_title": "Select PDF files for SmashPDF",
+        "pdf_files": "PDF files",
+        "all_files": "All files",
+        "skipped_not_pdf": "Skipped (not a PDF): {name}",
+        "no_pdf": (
+            "No PDF files were found. Drop or select one or more .pdf files."
+        ),
+        "processing_file": "Processing: {name}",
+        "cancelled": "Cancelled.",
+        "failed": "Failed: {error}",
+        "opening_prompt": "Enter the opening password for:\n{name}",
+        "completed_with_failures": (
+            "Completed: {successes}\nFailed or cancelled: {failures}\n\n{details}"
+        ),
+        "finished": "Finished. Created {successes} processed PDF(s).",
+        "version": "Version {version}",
+        "thank_you": "Thank you for your support",
+        "made_by": "Made by dklicious.",
+        "encryption_removed": "encryption removed",
+        "signature_fields_removed": (
+            "{count} digital-signature field(s) removed"
+        ),
+        "unrestricted_copy_created": "an unrestricted copy was created",
+        "standard_result": (
+            "standard lossless compression; {count} stream(s) optimized"
+        ),
+        "maximum_result": (
+            "maximum lossless compression; {count} stream(s) optimized"
+        ),
+        "result_summary": (
+            "Created: {output}\nPages: {pages}; {changes}\n"
+            "Size: {source_mb:.2f} MB -> {output_mb:.2f} MB "
+            "({reduction:.1f}% smaller)"
+        ),
+    },
+    "zh": {
+        "language": "语言",
+        "intro": (
+            "将 PDF 文件拖放到下方以解除限制。可选择在不降低质量的情况下压缩。"
+            "原始文件不会被更改。"
+        ),
+        "warning": (
+            "解锁后的副本将移除数字签名验证。可见的签名外观会保留。"
+        ),
+        "processing_option": "处理选项",
+        "compress_after_unlocking": "解锁后压缩 PDF（保持原始质量）",
+        "standard_compression": "标准压缩 — 通常缩小 5–30%",
+        "maximum_compression": "最大压缩 — 通常缩小 10–40%",
+        "no_quality_removed": "不会降低质量。处理后会显示实际节省的空间。",
+        "drop_files": "将 PDF 文件拖放到这里\n\n或单击此框浏览文件",
+        "choose_files": "单击此处选择 PDF 文件",
+        "processing_files": "正在处理 {count} 个 PDF 文件...",
+        "browse_files": "浏览 PDF 文件",
+        "close": "关闭",
+        "about": "关于",
+        "select_title": "选择要用 SmashPDF 处理的 PDF 文件",
+        "pdf_files": "PDF 文件",
+        "all_files": "所有文件",
+        "skipped_not_pdf": "已跳过（不是 PDF）：{name}",
+        "no_pdf": "未找到 PDF 文件。请拖放或选择一个或多个 .pdf 文件。",
+        "processing_file": "正在处理：{name}",
+        "cancelled": "已取消。",
+        "failed": "失败：{error}",
+        "opening_prompt": "请输入以下文件的打开密码：\n{name}",
+        "completed_with_failures": (
+            "已完成：{successes}\n失败或取消：{failures}\n\n{details}"
+        ),
+        "finished": "处理完成。已创建 {successes} 个 PDF 文件。",
+        "version": "版本 {version}",
+        "thank_you": "感谢您的支持",
+        "made_by": "由 dklicious 制作。",
+        "encryption_removed": "已移除加密",
+        "signature_fields_removed": "已移除 {count} 个数字签名字段",
+        "unrestricted_copy_created": "已创建无限制副本",
+        "standard_result": "标准无损压缩；已优化 {count} 个数据流",
+        "maximum_result": "最大无损压缩；已优化 {count} 个数据流",
+        "result_summary": (
+            "已创建：{output}\n页数：{pages}；{changes}\n"
+            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB "
+            "（缩小 {reduction:.1f}%）"
+        ),
+    },
+    "es": {
+        "language": "Idioma",
+        "intro": (
+            "Arrastra archivos PDF abajo para desbloquearlos. También puedes "
+            "comprimirlos sin reducir la calidad. Los originales no se modifican."
+        ),
+        "warning": (
+            "La verificación de firmas digitales se eliminará de las copias "
+            "desbloqueadas. La apariencia visible de las firmas se conserva."
+        ),
+        "processing_option": "Opción de procesamiento",
+        "compress_after_unlocking": (
+            "Comprimir el PDF después de desbloquearlo (mantiene la calidad)"
+        ),
+        "standard_compression": (
+            "Compresión estándar - normalmente 5-30% más pequeño"
+        ),
+        "maximum_compression": (
+            "Compresión máxima - normalmente 10-40% más pequeño"
+        ),
+        "no_quality_removed": (
+            "No se reduce la calidad. El ahorro exacto se muestra al terminar."
+        ),
+        "drop_files": (
+            "ARRASTRA LOS ARCHIVOS PDF AQUÍ\n\n"
+            "o haz clic en este cuadro para buscarlos"
+        ),
+        "choose_files": "HAZ CLIC AQUÍ PARA ELEGIR ARCHIVOS PDF",
+        "processing_files": "PROCESANDO {count} ARCHIVO(S) PDF...",
+        "browse_files": "Buscar archivos PDF",
+        "close": "Cerrar",
+        "about": "Acerca de",
+        "select_title": "Seleccionar archivos PDF para SmashPDF",
+        "pdf_files": "Archivos PDF",
+        "all_files": "Todos los archivos",
+        "skipped_not_pdf": "Omitido (no es un PDF): {name}",
+        "no_pdf": (
+            "No se encontraron archivos PDF. Arrastra o selecciona uno o más "
+            "archivos .pdf."
+        ),
+        "processing_file": "Procesando: {name}",
+        "cancelled": "Cancelado.",
+        "failed": "Error: {error}",
+        "opening_prompt": "Introduce la contraseña de apertura para:\n{name}",
+        "completed_with_failures": (
+            "Completados: {successes}\nFallidos o cancelados: {failures}\n\n"
+            "{details}"
+        ),
+        "finished": "Terminado. Se crearon {successes} PDF procesado(s).",
+        "version": "Versión {version}",
+        "thank_you": "Gracias por tu apoyo",
+        "made_by": "Creado por dklicious.",
+        "encryption_removed": "cifrado eliminado",
+        "signature_fields_removed": (
+            "{count} campo(s) de firma digital eliminado(s)"
+        ),
+        "unrestricted_copy_created": "se creó una copia sin restricciones",
+        "standard_result": (
+            "compresión estándar sin pérdida; {count} flujo(s) optimizado(s)"
+        ),
+        "maximum_result": (
+            "compresión máxima sin pérdida; {count} flujo(s) optimizado(s)"
+        ),
+        "result_summary": (
+            "Creado: {output}\nPáginas: {pages}; {changes}\n"
+            "Tamaño: {source_mb:.2f} MB -> {output_mb:.2f} MB "
+            "({reduction:.1f}% más pequeño)"
+        ),
+    },
+    "ja": {
+        "language": "言語",
+        "intro": (
+            "PDF ファイルを下にドロップして制限を解除します。品質を落とさずに"
+            "圧縮することもできます。元のファイルは変更されません。"
+        ),
+        "warning": (
+            "解除後のコピーではデジタル署名の検証が削除されます。"
+            "表示されている署名の外観は保持されます。"
+        ),
+        "processing_option": "処理オプション",
+        "compress_after_unlocking": "解除後に PDF を圧縮（元の品質を保持）",
+        "standard_compression": "標準圧縮 — 通常 5～30% 小さくなります",
+        "maximum_compression": "最大圧縮 — 通常 10～40% 小さくなります",
+        "no_quality_removed": "品質は低下しません。処理後に正確な削減量を表示します。",
+        "drop_files": (
+            "ここに PDF ファイルをドロップ\n\n"
+            "または、このボックスをクリックして参照"
+        ),
+        "choose_files": "ここをクリックして PDF ファイルを選択",
+        "processing_files": "{count} 個の PDF ファイルを処理中...",
+        "browse_files": "PDF ファイルを参照",
+        "close": "閉じる",
+        "about": "このアプリについて",
+        "select_title": "SmashPDF で処理する PDF ファイルを選択",
+        "pdf_files": "PDF ファイル",
+        "all_files": "すべてのファイル",
+        "skipped_not_pdf": "スキップ（PDF ではありません）：{name}",
+        "no_pdf": (
+            "PDF ファイルが見つかりません。1 つ以上の .pdf ファイルを"
+            "ドロップまたは選択してください。"
+        ),
+        "processing_file": "処理中：{name}",
+        "cancelled": "キャンセルしました。",
+        "failed": "失敗：{error}",
+        "opening_prompt": "次のファイルを開くパスワードを入力してください：\n{name}",
+        "completed_with_failures": (
+            "完了：{successes}\n失敗またはキャンセル：{failures}\n\n{details}"
+        ),
+        "finished": "完了しました。{successes} 個の PDF を作成しました。",
+        "version": "バージョン {version}",
+        "thank_you": "ご支援ありがとうございます",
+        "made_by": "制作：dklicious",
+        "encryption_removed": "暗号化を解除",
+        "signature_fields_removed": "デジタル署名フィールドを {count} 個削除",
+        "unrestricted_copy_created": "制限のないコピーを作成",
+        "standard_result": "標準ロスレス圧縮；{count} ストリームを最適化",
+        "maximum_result": "最大ロスレス圧縮；{count} ストリームを最適化",
+        "result_summary": (
+            "作成先：{output}\nページ数：{pages}；{changes}\n"
+            "サイズ：{source_mb:.2f} MB -> {output_mb:.2f} MB "
+            "（{reduction:.1f}% 縮小）"
+        ),
+    },
+    "ko": {
+        "language": "언어",
+        "intro": (
+            "PDF 파일을 아래에 놓아 제한을 해제하세요. 품질 저하 없이 압축할 수도 "
+            "있습니다. 원본 파일은 변경되지 않습니다."
+        ),
+        "warning": (
+            "제한이 해제된 사본에서는 디지털 서명 검증이 제거됩니다. "
+            "화면에 보이는 서명 모양은 유지됩니다."
+        ),
+        "processing_option": "처리 옵션",
+        "compress_after_unlocking": "제한 해제 후 PDF 압축(원본 품질 유지)",
+        "standard_compression": "표준 압축 — 일반적으로 5~30% 축소",
+        "maximum_compression": "최대 압축 — 일반적으로 10~40% 축소",
+        "no_quality_removed": (
+            "품질은 저하되지 않습니다. 처리 후 정확한 절감량을 표시합니다."
+        ),
+        "drop_files": (
+            "PDF 파일을 여기에 놓으세요\n\n"
+            "또는 이 상자를 클릭하여 찾아보기"
+        ),
+        "choose_files": "여기를 클릭하여 PDF 파일 선택",
+        "processing_files": "PDF 파일 {count}개 처리 중...",
+        "browse_files": "PDF 파일 찾아보기",
+        "close": "닫기",
+        "about": "정보",
+        "select_title": "SmashPDF로 처리할 PDF 파일 선택",
+        "pdf_files": "PDF 파일",
+        "all_files": "모든 파일",
+        "skipped_not_pdf": "건너뜀(PDF 아님): {name}",
+        "no_pdf": (
+            "PDF 파일을 찾을 수 없습니다. 하나 이상의 .pdf 파일을 놓거나 "
+            "선택하세요."
+        ),
+        "processing_file": "처리 중: {name}",
+        "cancelled": "취소되었습니다.",
+        "failed": "실패: {error}",
+        "opening_prompt": "다음 파일의 열기 암호를 입력하세요:\n{name}",
+        "completed_with_failures": (
+            "완료: {successes}\n실패 또는 취소: {failures}\n\n{details}"
+        ),
+        "finished": "완료되었습니다. 처리된 PDF {successes}개를 만들었습니다.",
+        "version": "버전 {version}",
+        "thank_you": "지원해 주셔서 감사합니다",
+        "made_by": "제작: dklicious",
+        "encryption_removed": "암호화 제거됨",
+        "signature_fields_removed": "디지털 서명 필드 {count}개 제거됨",
+        "unrestricted_copy_created": "제한 없는 사본 생성됨",
+        "standard_result": "표준 무손실 압축; 스트림 {count}개 최적화됨",
+        "maximum_result": "최대 무손실 압축; 스트림 {count}개 최적화됨",
+        "result_summary": (
+            "생성됨: {output}\n페이지: {pages}; {changes}\n"
+            "크기: {source_mb:.2f} MB -> {output_mb:.2f} MB "
+            "({reduction:.1f}% 축소)"
+        ),
+    },
+}
 COMPRESSION_PROFILES = {
     "none": {
         "label": "Unlock only",
@@ -476,8 +771,8 @@ def run_gui() -> int:
         drag_and_drop_available = False
 
     root.title(APP_NAME)
-    root.geometry("740x690")
-    root.minsize(680, 610)
+    root.geometry("780x720")
+    root.minsize(720, 640)
 
     app_logo = None
     try:
@@ -499,11 +794,31 @@ def run_gui() -> int:
     if "vista" in style.theme_names():
         style.theme_use("vista")
 
+    language_code = tk.StringVar(value="en")
+    language_name = tk.StringVar(value=LANGUAGE_NAMES["en"])
+
+    def tr(key: str, **values) -> str:
+        return TRANSLATIONS[language_code.get()][key].format(**values)
+
     outer = ttk.Frame(root, padding=20)
     outer.pack(fill="both", expand=True)
 
     header = ttk.Frame(outer)
     header.pack(fill="x", anchor="w")
+
+    language_frame = ttk.Frame(header)
+    language_frame.pack(side="right", anchor="ne")
+    language_label = ttk.Label(language_frame, text=tr("language"))
+    language_label.pack(side="left", padx=(0, 6))
+    language_selector = ttk.Combobox(
+        language_frame,
+        textvariable=language_name,
+        values=tuple(LANGUAGE_NAMES.values()),
+        state="readonly",
+        width=11,
+    )
+    language_selector.pack(side="left")
+
     if app_logo is not None:
         ttk.Label(header, image=app_logo).pack(side="left", padx=(0, 12))
     ttk.Label(
@@ -511,48 +826,45 @@ def run_gui() -> int:
         text=APP_NAME,
         font=("Segoe UI", 20, "bold"),
     ).pack(side="left")
-    ttk.Label(
-        outer,
-        text=(
-            "Drop PDF files below to unlock them. Optionally compress them "
-            "without reducing quality. Original files are never changed."
-        ),
-        wraplength=660,
-    ).pack(anchor="w", pady=(4, 14))
 
-    warning = (
-        "Digital-signature verification will be removed from unlocked copies. "
-        "Visible signature appearances are retained."
-    )
-    ttk.Label(
+    intro_label = ttk.Label(
         outer,
-        text=warning,
+        text=tr("intro"),
+        wraplength=700,
+    )
+    intro_label.pack(anchor="w", pady=(4, 14))
+
+    warning_label = ttk.Label(
+        outer,
+        text=tr("warning"),
         foreground="#9A4D00",
-        wraplength=660,
-    ).pack(anchor="w", pady=(0, 14))
+        wraplength=700,
+    )
+    warning_label.pack(anchor="w", pady=(0, 14))
 
     compression_enabled = tk.BooleanVar(value=False)
     compression_level = tk.StringVar(value="standard")
-    options = ttk.LabelFrame(outer, text="Processing option", padding=10)
+    options = ttk.LabelFrame(outer, text=tr("processing_option"), padding=10)
     options.pack(fill="x", pady=(0, 14))
 
-    ttk.Checkbutton(
+    compression_check = ttk.Checkbutton(
         options,
-        text="Compress PDF after unlocking (keeps original quality)",
+        text=tr("compress_after_unlocking"),
         variable=compression_enabled,
         command=lambda: update_compression_controls(),
-    ).pack(anchor="w", pady=(2, 5))
+    )
+    compression_check.pack(anchor="w", pady=(2, 5))
 
     standard_radio = ttk.Radiobutton(
         options,
-        text="Standard compression - usually 5-30% smaller",
+        text=tr("standard_compression"),
         variable=compression_level,
         value="standard",
     )
     standard_radio.pack(anchor="w", padx=(22, 0), pady=2)
     major_radio = ttk.Radiobutton(
         options,
-        text="Maximum compression - usually 10-40% smaller",
+        text=tr("maximum_compression"),
         variable=compression_level,
         value="major",
     )
@@ -565,21 +877,20 @@ def run_gui() -> int:
 
     update_compression_controls()
 
-    ttk.Label(
+    quality_label = ttk.Label(
         options,
-        text=("No quality is removed. The exact saving is shown after processing."),
+        text=tr("no_quality_removed"),
         foreground="#555555",
-        wraplength=630,
-    ).pack(anchor="w", pady=(5, 0))
-
-    drop_text = (
-        "DROP PDF FILES HERE\n\nor click this box to browse"
-        if drag_and_drop_available
-        else "CLICK HERE TO CHOOSE PDF FILES"
+        wraplength=670,
     )
+    quality_label.pack(anchor="w", pady=(5, 0))
+
+    def current_drop_text() -> str:
+        return tr("drop_files") if drag_and_drop_available else tr("choose_files")
+
     drop_zone = tk.Label(
         outer,
-        text=drop_text,
+        text=current_drop_text(),
         font=("Segoe UI", 12, "bold"),
         foreground="#1F4E79",
         background="#F2F7FC",
@@ -609,6 +920,38 @@ def run_gui() -> int:
         log.configure(state="disabled")
         root.update_idletasks()
 
+    def format_gui_result(result: UnlockResult) -> str:
+        changes = []
+        if result.was_encrypted:
+            changes.append(tr("encryption_removed"))
+        if result.removed_signature_fields:
+            changes.append(
+                tr(
+                    "signature_fields_removed",
+                    count=result.removed_signature_fields,
+                )
+            )
+        if not changes:
+            changes.append(tr("unrestricted_copy_created"))
+        if result.compression_mode == "standard":
+            changes.append(
+                tr("standard_result", count=result.streams_optimized)
+            )
+        elif result.compression_mode == "major":
+            changes.append(
+                tr("maximum_result", count=result.streams_optimized)
+            )
+
+        return tr(
+            "result_summary",
+            output=result.output,
+            pages=result.page_count,
+            changes="; ".join(changes),
+            source_mb=result.source_size / 1_048_576,
+            output_mb=result.output_size / 1_048_576,
+            reduction=result.reduction_percent,
+        )
+
     def process_files(filenames) -> None:
         pdf_files = []
         for filename in filenames:
@@ -616,12 +959,12 @@ def run_gui() -> int:
             if path.is_file() and path.suffix.lower() == ".pdf":
                 pdf_files.append(path)
             else:
-                append_log(f"Skipped (not a PDF): {path.name or path}")
+                append_log(tr("skipped_not_pdf", name=path.name or path))
 
         if not pdf_files:
             messagebox.showwarning(
                 APP_NAME,
-                "No PDF files were found. Drop or select one or more .pdf files.",
+                tr("no_pdf"),
                 parent=root,
             )
             return
@@ -629,7 +972,7 @@ def run_gui() -> int:
         selected_mode = compression_level.get() if compression_enabled.get() else "none"
         choose_button.configure(state="disabled")
         drop_zone.configure(
-            text=f"PROCESSING {len(pdf_files)} PDF FILE(S)...",
+            text=tr("processing_files", count=len(pdf_files)),
             cursor="watch",
             background="#FFF7E6",
         )
@@ -638,19 +981,19 @@ def run_gui() -> int:
 
         try:
             for source in pdf_files:
-                append_log(f"Processing: {source.name}")
+                append_log(tr("processing_file", name=source.name))
                 try:
                     result = unlock_pdf(source, compression=selected_mode)
                 except PasswordRequiredError:
                     password = simpledialog.askstring(
                         APP_NAME,
-                        f"Enter the opening password for:\n{source.name}",
+                        tr("opening_prompt", name=source.name),
                         parent=root,
                         show="*",
                     )
                     if password is None:
                         failures.append(f"{source.name}: cancelled")
-                        append_log("Cancelled.")
+                        append_log(tr("cancelled"))
                         continue
                     try:
                         result = unlock_pdf(
@@ -660,19 +1003,19 @@ def run_gui() -> int:
                         )
                     except Exception as exc:
                         failures.append(f"{source.name}: {exc}")
-                        append_log(f"Failed: {exc}")
+                        append_log(tr("failed", error=exc))
                         continue
                 except Exception as exc:
                     failures.append(f"{source.name}: {exc}")
-                    append_log(f"Failed: {exc}")
+                    append_log(tr("failed", error=exc))
                     continue
 
                 successes += 1
-                append_log(_format_result(result))
+                append_log(format_gui_result(result))
         finally:
             choose_button.configure(state="normal")
             drop_zone.configure(
-                text=drop_text,
+                text=current_drop_text(),
                 cursor="hand2",
                 background="#F2F7FC",
             )
@@ -680,22 +1023,29 @@ def run_gui() -> int:
         if failures:
             messagebox.showwarning(
                 APP_NAME,
-                f"Completed: {successes}\nFailed or cancelled: {len(failures)}\n\n"
-                + "\n".join(failures[:8]),
+                tr(
+                    "completed_with_failures",
+                    successes=successes,
+                    failures=len(failures),
+                    details="\n".join(failures[:8]),
+                ),
                 parent=root,
             )
         else:
             messagebox.showinfo(
                 APP_NAME,
-                f"Finished. Created {successes} processed PDF(s).",
+                tr("finished", successes=successes),
                 parent=root,
             )
 
     def select_and_unlock() -> None:
         filenames = filedialog.askopenfilenames(
             parent=root,
-            title="Select PDF files for SmashPDF",
-            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+            title=tr("select_title"),
+            filetypes=[
+                (tr("pdf_files"), "*.pdf"),
+                (tr("all_files"), "*.*"),
+            ],
         )
         if filenames:
             process_files(filenames)
@@ -706,7 +1056,7 @@ def run_gui() -> int:
 
     def show_about() -> None:
         about = tk.Toplevel(root)
-        about.title(f"About {APP_NAME}")
+        about.title(f"{tr('about')} {APP_NAME}")
         about.geometry("410x310")
         about.resizable(False, False)
         about.transient(root)
@@ -721,17 +1071,17 @@ def run_gui() -> int:
         ).pack(pady=((24 if app_logo is None else 2), 2))
         ttk.Label(
             about,
-            text=f"Version {APP_VERSION}",
+            text=tr("version", version=APP_VERSION),
             foreground="#555555",
         ).pack()
         ttk.Label(
             about,
-            text="Thank you for your support",
+            text=tr("thank_you"),
             font=("Segoe UI", 11),
         ).pack(pady=(20, 4))
         ttk.Label(
             about,
-            text="Made by dklicious.",
+            text=tr("made_by"),
             font=("Segoe UI", 10, "bold"),
         ).pack()
         ttk.Label(
@@ -739,7 +1089,7 @@ def run_gui() -> int:
             text=PROJECT_URL,
             foreground="#1F4E79",
         ).pack(pady=(8, 14))
-        ttk.Button(about, text="Close", command=about.destroy).pack()
+        ttk.Button(about, text=tr("close"), command=about.destroy).pack()
 
         about.update_idletasks()
         x = root.winfo_x() + (root.winfo_width() - about.winfo_width()) // 2
@@ -747,22 +1097,55 @@ def run_gui() -> int:
         about.geometry(f"+{max(0, x)}+{max(0, y)}")
         about.focus_set()
 
+    choose_button = ttk.Button(
+        button_row,
+        text=tr("browse_files"),
+        command=select_and_unlock,
+    )
+    choose_button.pack(side="left")
+    close_button = ttk.Button(
+        button_row,
+        text=tr("close"),
+        command=root.destroy,
+    )
+    close_button.pack(side="right")
+    about_button = ttk.Button(
+        button_row,
+        text=tr("about"),
+        command=show_about,
+    )
+    about_button.pack(
+        side="right",
+        padx=(0, 8),
+    )
+
+    def update_language(_event=None) -> None:
+        selected_name = language_name.get()
+        selected_code = next(
+            code
+            for code, name in LANGUAGE_NAMES.items()
+            if name == selected_name
+        )
+        language_code.set(selected_code)
+
+        language_label.configure(text=tr("language"))
+        intro_label.configure(text=tr("intro"))
+        warning_label.configure(text=tr("warning"))
+        options.configure(text=tr("processing_option"))
+        compression_check.configure(text=tr("compress_after_unlocking"))
+        standard_radio.configure(text=tr("standard_compression"))
+        major_radio.configure(text=tr("maximum_compression"))
+        quality_label.configure(text=tr("no_quality_removed"))
+        drop_zone.configure(text=current_drop_text())
+        choose_button.configure(text=tr("browse_files"))
+        about_button.configure(text=tr("about"))
+        close_button.configure(text=tr("close"))
+
+    language_selector.bind("<<ComboboxSelected>>", update_language)
     drop_zone.bind("<Button-1>", lambda _event: select_and_unlock())
     if drag_and_drop_available and DND_FILES is not None:
         drop_zone.drop_target_register(DND_FILES)
         drop_zone.dnd_bind("<<Drop>>", handle_drop)
-
-    choose_button = ttk.Button(
-        button_row,
-        text="Browse PDF Files",
-        command=select_and_unlock,
-    )
-    choose_button.pack(side="left")
-    ttk.Button(button_row, text="Close", command=root.destroy).pack(side="right")
-    ttk.Button(button_row, text="About", command=show_about).pack(
-        side="right",
-        padx=(0, 8),
-    )
 
     root.mainloop()
     return 0
