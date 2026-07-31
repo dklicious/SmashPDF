@@ -32,11 +32,12 @@ from pypdf.generic import (
 )
 
 APP_NAME = "SmashPDF"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 PROJECT_URL = "https://github.com/dklicious/SmashPDF"
 LANGUAGE_NAMES = {
     "en": "English",
-    "zh": "中文",
+    "zh": "简体中文",
+    "zh_hant": "繁體中文",
     "es": "Español",
     "ja": "日本語",
     "ko": "한국어",
@@ -147,6 +148,53 @@ TRANSLATIONS = {
             "已创建：{output}\n页数：{pages}；{changes}\n"
             "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB "
             "（缩小 {reduction:.1f}%）"
+        ),
+    },
+    "zh_hant": {
+        "language": "語言",
+        "intro": (
+            "將 PDF 檔案拖放到下方以解除限制。可選擇在不降低品質的情況下壓縮。"
+            "原始檔案不會被變更。"
+        ),
+        "warning": (
+            "解鎖後的副本將移除數位簽章驗證。可見的簽章外觀會保留。"
+        ),
+        "processing_option": "處理選項",
+        "compress_after_unlocking": "解鎖後壓縮 PDF（保持原始品質）",
+        "standard_compression": "標準壓縮 — 通常縮小 5–30%",
+        "maximum_compression": "最大壓縮 — 通常縮小 10–40%",
+        "no_quality_removed": "不會降低品質。處理後會顯示實際節省的空間。",
+        "drop_files": "將 PDF 檔案拖放到這裡\n\n或按一下此方塊瀏覽檔案",
+        "choose_files": "按一下此處選擇 PDF 檔案",
+        "processing_files": "正在處理 {count} 個 PDF 檔案...",
+        "browse_files": "瀏覽 PDF 檔案",
+        "close": "關閉",
+        "about": "關於",
+        "select_title": "選擇要用 SmashPDF 處理的 PDF 檔案",
+        "pdf_files": "PDF 檔案",
+        "all_files": "所有檔案",
+        "skipped_not_pdf": "已略過（不是 PDF）：{name}",
+        "no_pdf": "找不到 PDF 檔案。請拖放或選擇一個或多個 .pdf 檔案。",
+        "processing_file": "正在處理：{name}",
+        "cancelled": "已取消。",
+        "failed": "失敗：{error}",
+        "opening_prompt": "請輸入以下檔案的開啟密碼：\n{name}",
+        "completed_with_failures": (
+            "已完成：{successes}\n失敗或取消：{failures}\n\n{details}"
+        ),
+        "finished": "處理完成。已建立 {successes} 個 PDF 檔案。",
+        "version": "版本 {version}",
+        "thank_you": "感謝您的支持",
+        "made_by": "由 dklicious 製作。",
+        "encryption_removed": "已移除加密",
+        "signature_fields_removed": "已移除 {count} 個數位簽章欄位",
+        "unrestricted_copy_created": "已建立無限制副本",
+        "standard_result": "標準無損壓縮；已最佳化 {count} 個資料流",
+        "maximum_result": "最大無損壓縮；已最佳化 {count} 個資料流",
+        "result_summary": (
+            "已建立：{output}\n頁數：{pages}；{changes}\n"
+            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB "
+            "（縮小 {reduction:.1f}%）"
         ),
     },
     "es": {

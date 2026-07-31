@@ -31,7 +31,22 @@ def _sha256(path: Path) -> str:
 
 
 def test_all_supported_languages_have_complete_translations() -> None:
-    assert set(LANGUAGE_NAMES) == {"en", "zh", "es", "ja", "ko"}
+    assert set(LANGUAGE_NAMES) == {
+        "en",
+        "zh",
+        "zh_hant",
+        "es",
+        "ja",
+        "ko",
+    }
+    assert list(LANGUAGE_NAMES.values()) == [
+        "English",
+        "简体中文",
+        "繁體中文",
+        "Español",
+        "日本語",
+        "한국어",
+    ]
     english_keys = set(TRANSLATIONS["en"])
     formatter = Formatter()
 
