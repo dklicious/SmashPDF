@@ -11,6 +11,10 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -19,9 +23,17 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: requirements-build.lock
+
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python -m scripts.check_release_version "${{ github.ref_name }}"
 
       - name: Install build dependencies
-        run: python -m pip install -r requirements.txt pyinstaller==6.21.0
+        run: python -m pip install --require-hashes -r requirements-build.lock
+
+      - name: Generate Windows version metadata
+        run: python -m scripts.generate_version_info build/version_info.txt
 
       - name: Build
         run: >
@@ -32,15 +44,66 @@ jobs:
           --windowed
           --name SmashPDF
           --icon assets/smashpdf.ico
+          --version-file build/version_info.txt
           --add-data "assets/smashpdf_logo_64.png;assets"
           --add-data "assets/smashpdf.ico;assets"
           --collect-all tkinterdnd2
           smashpdf.py
 
+      - name: Verify Windows version metadata
+        shell: pwsh
+        run: |
+          $expected = python -c "from _version import __version__; print(__version__)"
+          $info = (Get-Item -LiteralPath "dist\SmashPDF.exe").VersionInfo
+          if ($info.FileVersion -ne $expected) {
+            throw "File version $($info.FileVersion) does not match $expected."
+          }
+          if ($info.ProductName -ne "SmashPDF") {
+            throw "Product metadata is missing or incorrect."
+          }
+
+      - name: Authenticode sign tagged release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: .\scripts\sign_windows.ps1 -Executable "dist\SmashPDF.exe"
+
+      - name: Create checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath "dist\SmashPDF.exe").Hash
+          "$($hash.ToLowerInvariant())  SmashPDF.exe" |
+            Set-Content -LiteralPath "dist\SmashPDF.exe.sha256" -Encoding ascii
+
+      - name: Audit dependencies and generate SBOM
+        run: >
+          python -m pip_audit
+          -r requirements.lock
+          --format cyclonedx-json
+          --output dist/SmashPDF.sbom.cdx.json
+
+      - name: Attest release provenance
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-path: dist/SmashPDF.exe
+
+      - name: Attest release SBOM
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-path: dist/SmashPDF.exe
+          sbom-path: dist/SmashPDF.sbom.cdx.json
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: SmashPDF-Windows
-          path: dist/SmashPDF.exe
+          path: |
+            dist/SmashPDF.exe
+            dist/SmashPDF.exe.sha256
+            dist/SmashPDF.sbom.cdx.json
           if-no-files-found: error
 
   release:
@@ -63,10 +126,28 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           $tag = "${{ github.ref_name }}"
+          $signature = Get-AuthenticodeSignature -LiteralPath "dist\SmashPDF.exe"
+          if ($signature.Status -ne "Valid") {
+            throw "Release executable has invalid signature status: $($signature.Status)"
+          }
+          $expectedHash = (
+            Get-Content -LiteralPath "dist\SmashPDF.exe.sha256" -Raw
+          ).Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)[0]
+          $actualHash = (
+            Get-FileHash -Algorithm SHA256 -LiteralPath "dist\SmashPDF.exe"
+          ).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) {
+            throw "Release checksum verification failed."
+          }
+          $assets = @(
+            "dist\SmashPDF.exe",
+            "dist\SmashPDF.exe.sha256",
+            "dist\SmashPDF.sbom.cdx.json"
+          )
           if (gh release view $tag 2>$null) {
-            gh release upload $tag "dist/SmashPDF.exe" --clobber
+            gh release upload $tag $assets --clobber
           } else {
-            gh release create $tag "dist/SmashPDF.exe" `
+            gh release create $tag $assets `
               --title "SmashPDF $tag" `
               --generate-notes
           }

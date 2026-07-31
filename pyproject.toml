@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smashpdf"
-version = "1.0.0"
+dynamic = ["version"]
 description = "Local Windows PDF unlocker with optional lossless compression"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,6 +23,12 @@ Issues = "https://github.com/dklicious/SmashPDF/issues"
 [project.scripts]
 smashpdf = "smashpdf:main"
 
+[tool.setuptools]
+py-modules = ["smashpdf", "_version"]
+
+[tool.setuptools.dynamic]
+version = { attr = "_version.__version__" }
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
@@ -33,3 +39,12 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.coverage.run]
+branch = true
+source = ["smashpdf"]
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+skip_covered = true

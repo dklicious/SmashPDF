@@ -15,6 +15,10 @@ Download `SmashPDF.exe` from the
 double-click it. No installation, Python runtime, account, or internet
 connection is required.
 
+Each release also includes a SHA-256 checksum and CycloneDX software bill of
+materials (SBOM). Tagged release executables must pass Authenticode signing
+and GitHub build-provenance attestation before publication.
+
 Choose a processing option, then drag one or more PDFs into the drop box. You
 can also click the box to browse. Each result is saved beside its source.
 Use the language selector to switch the interface instantly between English,
@@ -64,13 +68,25 @@ Requires Python 3.11 or newer.
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-dev.lock
 .\.venv\Scripts\python.exe -m ruff check .
-.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe -X dev -m coverage run -m pytest -W error
+.\.venv\Scripts\python.exe -m coverage report
 .\.venv\Scripts\python.exe -m bandit -q -r smashpdf.py
-.\.venv\Scripts\python.exe -m pip_audit -r requirements.txt
+.\.venv\Scripts\python.exe -m pip_audit -r requirements-dev.lock
 .\build.ps1
 ```
+
+`requirements.lock`, `requirements-build.lock`, and `requirements-dev.lock`
+pin the complete dependency graphs and hashes used by the app, release build,
+and CI respectively.
+
+Tagged GitHub releases additionally require two repository secrets:
+`WINDOWS_CERTIFICATE`, containing a base64-encoded trusted code-signing PFX,
+and `WINDOWS_CERTIFICATE_PASSWORD`. The release workflow imports the
+certificate only on the temporary GitHub runner, signs and timestamps the EXE,
+verifies the signature, and then removes the imported certificate.
 
 ## Command line
 
@@ -89,8 +105,17 @@ Use `python smashpdf.py --help` for all options.
 - Processing is local; files and passwords are not uploaded.
 - The source file is never overwritten.
 - Output is written atomically and validated before delivery.
+- Concurrent SmashPDF instances cannot replace one another's new outputs.
 - A page-count check runs after every conversion.
 - This tool does not bypass an unknown opening password.
+
+To verify a downloaded release:
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\SmashPDF.exe
+Get-AuthenticodeSignature .\SmashPDF.exe
+gh attestation verify .\SmashPDF.exe --repo dklicious/SmashPDF
+```
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting and the security
 model.

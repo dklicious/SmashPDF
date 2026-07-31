@@ -32,8 +32,10 @@ from pypdf.generic import (
     TextStringObject,
 )
 
+from _version import __version__
+
 APP_NAME = "SmashPDF"
-APP_VERSION = "1.2.2"
+APP_VERSION = __version__
 PROJECT_URL = "https://github.com/dklicious/SmashPDF"
 LANGUAGE_NAMES = {
     "zh": "简体中文",
@@ -73,9 +75,7 @@ TRANSLATIONS = {
         "pdf_files": "PDF files",
         "all_files": "All files",
         "skipped_not_pdf": "Skipped (not a PDF): {name}",
-        "no_pdf": (
-            "No PDF files were found. Drop or select one or more .pdf files."
-        ),
+        "no_pdf": ("No PDF files were found. Drop or select one or more .pdf files."),
         "processing_file": "Processing: {name}",
         "cancelled": "Cancelled.",
         "failed": "Failed: {error}",
@@ -87,21 +87,19 @@ TRANSLATIONS = {
         "version": "Version {version}",
         "thank_you": "Thank you for your support",
         "made_by": "Made by dklicious.",
+        "size_smaller": "{percent:.1f}% smaller",
+        "size_larger": "{percent:.1f}% larger",
+        "size_unchanged": "same size",
         "encryption_removed": "encryption removed",
-        "signature_fields_removed": (
-            "{count} digital-signature field(s) removed"
-        ),
+        "signature_fields_removed": ("{count} digital-signature field(s) removed"),
         "unrestricted_copy_created": "an unrestricted copy was created",
         "standard_result": (
             "standard lossless compression; {count} stream(s) optimized"
         ),
-        "maximum_result": (
-            "maximum lossless compression; {count} stream(s) optimized"
-        ),
+        "maximum_result": ("maximum lossless compression; {count} stream(s) optimized"),
         "result_summary": (
             "Created: {output}\nPages: {pages}; {changes}\n"
-            "Size: {source_mb:.2f} MB -> {output_mb:.2f} MB "
-            "({reduction:.1f}% smaller)"
+            "Size: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
         ),
     },
     "zh": {
@@ -110,9 +108,7 @@ TRANSLATIONS = {
             "将 PDF 文件拖放到下方以解除限制。可选择在不降低质量的情况下压缩。"
             "原始文件不会被更改。"
         ),
-        "warning": (
-            "解锁后的副本将移除数字签名验证。可见的签名外观会保留。"
-        ),
+        "warning": ("解锁后的副本将移除数字签名验证。可见的签名外观会保留。"),
         "processing_option": "处理选项",
         "compress_after_unlocking": "解锁后压缩 PDF（保持原始质量）",
         "standard_compression": "标准压缩 — 通常缩小 5–30%",
@@ -140,6 +136,9 @@ TRANSLATIONS = {
         "version": "版本 {version}",
         "thank_you": "感谢您的支持",
         "made_by": "由 dklicious 制作。",
+        "size_smaller": "缩小 {percent:.1f}%",
+        "size_larger": "增大 {percent:.1f}%",
+        "size_unchanged": "大小不变",
         "encryption_removed": "已移除加密",
         "signature_fields_removed": "已移除 {count} 个数字签名字段",
         "unrestricted_copy_created": "已创建无限制副本",
@@ -147,8 +146,7 @@ TRANSLATIONS = {
         "maximum_result": "最大无损压缩；已优化 {count} 个数据流",
         "result_summary": (
             "已创建：{output}\n页数：{pages}；{changes}\n"
-            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB "
-            "（缩小 {reduction:.1f}%）"
+            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
         ),
     },
     "zh_hant": {
@@ -157,9 +155,7 @@ TRANSLATIONS = {
             "將 PDF 檔案拖放到下方以解除限制。可選擇在不降低品質的情況下壓縮。"
             "原始檔案不會被變更。"
         ),
-        "warning": (
-            "解鎖後的副本將移除數位簽章驗證。可見的簽章外觀會保留。"
-        ),
+        "warning": ("解鎖後的副本將移除數位簽章驗證。可見的簽章外觀會保留。"),
         "processing_option": "處理選項",
         "compress_after_unlocking": "解鎖後壓縮 PDF（保持原始品質）",
         "standard_compression": "標準壓縮 — 通常縮小 5–30%",
@@ -187,6 +183,9 @@ TRANSLATIONS = {
         "version": "版本 {version}",
         "thank_you": "感謝您的支持",
         "made_by": "由 dklicious 製作。",
+        "size_smaller": "縮小 {percent:.1f}%",
+        "size_larger": "增大 {percent:.1f}%",
+        "size_unchanged": "大小不變",
         "encryption_removed": "已移除加密",
         "signature_fields_removed": "已移除 {count} 個數位簽章欄位",
         "unrestricted_copy_created": "已建立無限制副本",
@@ -194,8 +193,7 @@ TRANSLATIONS = {
         "maximum_result": "最大無損壓縮；已最佳化 {count} 個資料流",
         "result_summary": (
             "已建立：{output}\n頁數：{pages}；{changes}\n"
-            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB "
-            "（縮小 {reduction:.1f}%）"
+            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
         ),
     },
     "es": {
@@ -212,18 +210,13 @@ TRANSLATIONS = {
         "compress_after_unlocking": (
             "Comprimir el PDF después de desbloquearlo (mantiene la calidad)"
         ),
-        "standard_compression": (
-            "Compresión estándar - normalmente 5-30% más pequeño"
-        ),
-        "maximum_compression": (
-            "Compresión máxima - normalmente 10-40% más pequeño"
-        ),
+        "standard_compression": ("Compresión estándar - normalmente 5-30% más pequeño"),
+        "maximum_compression": ("Compresión máxima - normalmente 10-40% más pequeño"),
         "no_quality_removed": (
             "No se reduce la calidad. El ahorro exacto se muestra al terminar."
         ),
         "drop_files": (
-            "ARRASTRA LOS ARCHIVOS PDF AQUÍ\n\n"
-            "o haz clic en este cuadro para buscarlos"
+            "ARRASTRA LOS ARCHIVOS PDF AQUÍ\n\no haz clic en este cuadro para buscarlos"
         ),
         "choose_files": "HAZ CLIC AQUÍ PARA ELEGIR ARCHIVOS PDF",
         "processing_files": "PROCESANDO {count} ARCHIVO(S) PDF...",
@@ -243,17 +236,17 @@ TRANSLATIONS = {
         "failed": "Error: {error}",
         "opening_prompt": "Introduce la contraseña de apertura para:\n{name}",
         "completed_with_failures": (
-            "Completados: {successes}\nFallidos o cancelados: {failures}\n\n"
-            "{details}"
+            "Completados: {successes}\nFallidos o cancelados: {failures}\n\n{details}"
         ),
         "finished": "Terminado. Se crearon {successes} PDF procesado(s).",
         "version": "Versión {version}",
         "thank_you": "Gracias por tu apoyo",
         "made_by": "Creado por dklicious.",
+        "size_smaller": "{percent:.1f}% más pequeño",
+        "size_larger": "{percent:.1f}% más grande",
+        "size_unchanged": "mismo tamaño",
         "encryption_removed": "cifrado eliminado",
-        "signature_fields_removed": (
-            "{count} campo(s) de firma digital eliminado(s)"
-        ),
+        "signature_fields_removed": ("{count} campo(s) de firma digital eliminado(s)"),
         "unrestricted_copy_created": "se creó una copia sin restricciones",
         "standard_result": (
             "compresión estándar sin pérdida; {count} flujo(s) optimizado(s)"
@@ -263,8 +256,7 @@ TRANSLATIONS = {
         ),
         "result_summary": (
             "Creado: {output}\nPáginas: {pages}; {changes}\n"
-            "Tamaño: {source_mb:.2f} MB -> {output_mb:.2f} MB "
-            "({reduction:.1f}% más pequeño)"
+            "Tamaño: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
         ),
     },
     "ja": {
@@ -283,8 +275,7 @@ TRANSLATIONS = {
         "maximum_compression": "最大圧縮 — 通常 10～40% 小さくなります",
         "no_quality_removed": "品質は低下しません。処理後に正確な削減量を表示します。",
         "drop_files": (
-            "ここに PDF ファイルをドロップ\n\n"
-            "または、このボックスをクリックして参照"
+            "ここに PDF ファイルをドロップ\n\nまたは、このボックスをクリックして参照"
         ),
         "choose_files": "ここをクリックして PDF ファイルを選択",
         "processing_files": "{count} 個の PDF ファイルを処理中...",
@@ -310,6 +301,9 @@ TRANSLATIONS = {
         "version": "バージョン {version}",
         "thank_you": "ご支援ありがとうございます",
         "made_by": "制作：dklicious",
+        "size_smaller": "{percent:.1f}% 縮小",
+        "size_larger": "{percent:.1f}% 増加",
+        "size_unchanged": "同じサイズ",
         "encryption_removed": "暗号化を解除",
         "signature_fields_removed": "デジタル署名フィールドを {count} 個削除",
         "unrestricted_copy_created": "制限のないコピーを作成",
@@ -317,8 +311,7 @@ TRANSLATIONS = {
         "maximum_result": "最大ロスレス圧縮；{count} ストリームを最適化",
         "result_summary": (
             "作成先：{output}\nページ数：{pages}；{changes}\n"
-            "サイズ：{source_mb:.2f} MB -> {output_mb:.2f} MB "
-            "（{reduction:.1f}% 縮小）"
+            "サイズ：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
         ),
     },
     "ko": {
@@ -339,8 +332,7 @@ TRANSLATIONS = {
             "품질은 저하되지 않습니다. 처리 후 정확한 절감량을 표시합니다."
         ),
         "drop_files": (
-            "PDF 파일을 여기에 놓으세요\n\n"
-            "또는 이 상자를 클릭하여 찾아보기"
+            "PDF 파일을 여기에 놓으세요\n\n또는 이 상자를 클릭하여 찾아보기"
         ),
         "choose_files": "여기를 클릭하여 PDF 파일 선택",
         "processing_files": "PDF 파일 {count}개 처리 중...",
@@ -352,8 +344,7 @@ TRANSLATIONS = {
         "all_files": "모든 파일",
         "skipped_not_pdf": "건너뜀(PDF 아님): {name}",
         "no_pdf": (
-            "PDF 파일을 찾을 수 없습니다. 하나 이상의 .pdf 파일을 놓거나 "
-            "선택하세요."
+            "PDF 파일을 찾을 수 없습니다. 하나 이상의 .pdf 파일을 놓거나 선택하세요."
         ),
         "processing_file": "처리 중: {name}",
         "cancelled": "취소되었습니다.",
@@ -366,6 +357,9 @@ TRANSLATIONS = {
         "version": "버전 {version}",
         "thank_you": "지원해 주셔서 감사합니다",
         "made_by": "제작: dklicious",
+        "size_smaller": "{percent:.1f}% 감소",
+        "size_larger": "{percent:.1f}% 증가",
+        "size_unchanged": "동일한 크기",
         "encryption_removed": "암호화 제거됨",
         "signature_fields_removed": "디지털 서명 필드 {count}개 제거됨",
         "unrestricted_copy_created": "제한 없는 사본 생성됨",
@@ -373,8 +367,7 @@ TRANSLATIONS = {
         "maximum_result": "최대 무손실 압축; 스트림 {count}개 최적화됨",
         "result_summary": (
             "생성됨: {output}\n페이지: {pages}; {changes}\n"
-            "크기: {source_mb:.2f} MB -> {output_mb:.2f} MB "
-            "({reduction:.1f}% 축소)"
+            "크기: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
         ),
     },
 }
@@ -415,15 +408,22 @@ class UnlockResult:
     def reduction_percent(self) -> float:
         if not self.source_size:
             return 0.0
-        return max(0.0, (1 - self.output_size / self.source_size) * 100)
+        return (1 - self.output_size / self.source_size) * 100
+
+
+def _format_size_change(result: UnlockResult, language: str = "en") -> str:
+    translations = TRANSLATIONS[language]
+    if result.reduction_percent > 0:
+        return translations["size_smaller"].format(percent=result.reduction_percent)
+    if result.reduction_percent < 0:
+        return translations["size_larger"].format(percent=abs(result.reduction_percent))
+    return translations["size_unchanged"]
 
 
 def resource_path(relative_path: str) -> Path:
     """Resolve a bundled resource in source and PyInstaller builds."""
 
-    application_root = Path(
-        getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)
-    )
+    application_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     return application_root / relative_path
 
 
@@ -431,11 +431,7 @@ def settings_path() -> Path:
     """Return the per-user settings path without using the working directory."""
 
     local_app_data = os.environ.get("LOCALAPPDATA")
-    settings_root = (
-        Path(local_app_data)
-        if local_app_data
-        else Path.home() / ".config"
-    )
+    settings_root = Path(local_app_data) if local_app_data else Path.home() / ".config"
     return settings_root / APP_NAME / "settings.json"
 
 
@@ -693,6 +689,21 @@ def default_output_path(source: Path, compression: str = "none") -> Path:
         number += 1
 
 
+def _publish_without_overwrite(temp_path: Path, output_path: Path) -> None:
+    """Atomically publish a file while refusing to replace an existing path."""
+
+    try:
+        if os.name == "nt":
+            os.rename(temp_path, output_path)
+        else:
+            os.link(temp_path, output_path)
+            temp_path.unlink()
+    except OSError as error:
+        if output_path.exists():
+            raise FileExistsError(f"Output already exists: {output_path}") from error
+        raise
+
+
 def _losslessly_recompress_streams(writer: PdfWriter, mode: str) -> int:
     if mode == "none":
         return 0
@@ -782,6 +793,7 @@ def unlock_pdf(
     if source_path.suffix.lower() != ".pdf":
         raise ValueError(f"Not a PDF file: {source_path}")
 
+    automatic_output = output is None
     output_path = (
         Path(output).expanduser().resolve()
         if output is not None
@@ -817,10 +829,17 @@ def unlock_pdf(
     try:
         writer.write(str(temp_path))
         _validate_output(temp_path, expected_pages)
-        if output_path.exists() and overwrite:
+        if overwrite:
             os.replace(temp_path, output_path)
         else:
-            temp_path.replace(output_path)
+            while True:
+                try:
+                    _publish_without_overwrite(temp_path, output_path)
+                    break
+                except FileExistsError:
+                    if not automatic_output:
+                        raise
+                    output_path = default_output_path(source_path, compression)
     finally:
         if temp_path.exists():
             temp_path.unlink()
@@ -861,7 +880,7 @@ def _format_result(result: UnlockResult) -> str:
         + "; ".join(changes)
         + f"\nSize: {result.source_size / 1_048_576:.2f} MB -> "
         f"{result.output_size / 1_048_576:.2f} MB "
-        f"({result.reduction_percent:.1f}% smaller)"
+        f"({_format_size_change(result)})"
     )
 
 
@@ -885,9 +904,7 @@ def run_gui() -> int:
 
     app_logo = None
     try:
-        app_logo = tk.PhotoImage(
-            file=str(resource_path("assets/smashpdf_logo_64.png"))
-        )
+        app_logo = tk.PhotoImage(file=str(resource_path("assets/smashpdf_logo_64.png")))
         root.iconphoto(True, app_logo)
     except tk.TclError as error:
         print(f"Could not load the application logo: {error}", file=sys.stderr)
@@ -905,9 +922,7 @@ def run_gui() -> int:
 
     preferred_language = load_language_preference()
     language_code = tk.StringVar(value=preferred_language)
-    language_name = tk.StringVar(
-        value=LANGUAGE_NAMES[preferred_language]
-    )
+    language_name = tk.StringVar(value=LANGUAGE_NAMES[preferred_language])
 
     def tr(key: str, **values) -> str:
         return TRANSLATIONS[language_code.get()][key].format(**values)
@@ -1046,13 +1061,9 @@ def run_gui() -> int:
         if not changes:
             changes.append(tr("unrestricted_copy_created"))
         if result.compression_mode == "standard":
-            changes.append(
-                tr("standard_result", count=result.streams_optimized)
-            )
+            changes.append(tr("standard_result", count=result.streams_optimized))
         elif result.compression_mode == "major":
-            changes.append(
-                tr("maximum_result", count=result.streams_optimized)
-            )
+            changes.append(tr("maximum_result", count=result.streams_optimized))
 
         return tr(
             "result_summary",
@@ -1061,7 +1072,7 @@ def run_gui() -> int:
             changes="; ".join(changes),
             source_mb=result.source_size / 1_048_576,
             output_mb=result.output_size / 1_048_576,
-            reduction=result.reduction_percent,
+            size_change=_format_size_change(result, language_code.get()),
         )
 
     def process_files(filenames) -> None:
@@ -1234,9 +1245,7 @@ def run_gui() -> int:
     def update_language(_event=None) -> None:
         selected_name = language_name.get()
         selected_code = next(
-            code
-            for code, name in LANGUAGE_NAMES.items()
-            if name == selected_name
+            code for code, name in LANGUAGE_NAMES.items() if name == selected_name
         )
         language_code.set(selected_code)
 
