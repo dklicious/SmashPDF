@@ -1006,11 +1006,12 @@ def _format_result(result: UnlockResult) -> str:
 
 
 def _increase_named_font_sizes(root, increase: int = 2) -> None:
-    """Increase every Tk named font while preserving its family and styling."""
+    """Increase every Tk named font and apply a bold, high-visibility weight."""
     from tkinter import font as tkfont
 
     for font_name in tkfont.names(root=root):
         named_font = tkfont.nametofont(font_name, root=root)
+        named_font.configure(weight="bold")
         current_size = int(named_font.cget("size"))
         if current_size > 0:
             named_font.configure(size=current_size + increase)
@@ -1190,7 +1191,7 @@ def run_gui() -> int:
         outer,
         height=9,
         wrap="word",
-        font=("Consolas", 11),
+        font=("Consolas", 11, "bold"),
         state="disabled",
     )
     log.pack(fill="both", expand=True)
@@ -1360,7 +1361,7 @@ def run_gui() -> int:
         ttk.Label(
             about,
             text=tr("thank_you"),
-            font=("Segoe UI", 13),
+            font=("Segoe UI", 13, "bold"),
         ).pack(pady=(20, 4))
         ttk.Label(
             about,
@@ -1372,7 +1373,7 @@ def run_gui() -> int:
             text=PROJECT_URL,
             foreground="#1F4E79",
             cursor="hand2",
-            font=("Segoe UI", 12, "underline"),
+            font=("Segoe UI", 12, "bold underline"),
             takefocus=True,
         )
         project_link.pack(pady=(8, 14))

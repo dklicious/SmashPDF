@@ -29,18 +29,8 @@ def _font_size(root, widget) -> int:
     return int(tkfont.Font(root=root, font=widget.cget("font")).actual("size"))
 
 
-def test_named_fonts_are_two_sizes_larger() -> None:
-    root = tk.Tk()
-    root.withdraw()
-    positive = tkfont.Font(root=root, name="SmashPDFPositive", size=10)
-    negative = tkfont.Font(root=root, name="SmashPDFNegative", size=-10)
-
-    try:
-        smashpdf._increase_named_font_sizes(root)
-        assert int(positive.cget("size")) == 12
-        assert int(negative.cget("size")) == -12
-    finally:
-        root.destroy()
+def _font_weight(root, widget) -> str:
+    return str(tkfont.Font(root=root, font=widget.cget("font")).actual("weight"))
 
 
 def test_gui_constructs_processes_and_switches_language(
@@ -57,14 +47,25 @@ def test_gui_constructs_processes_and_switches_language(
     show_info = Mock()
     show_warning = Mock()
     open_project = Mock(return_value=True)
+    default_font_size = None
 
     def hidden_tk():
+        nonlocal default_font_size
         root = real_tk()
         root.withdraw()
+        default_font_size = int(
+            tkfont.nametofont("TkDefaultFont", root=root).actual("size")
+        )
         return root
 
     def exercise_interface(root, _n=0):
         root.update_idletasks()
+        configured_default = tkfont.nametofont("TkDefaultFont", root=root)
+        assert configured_default.actual("weight") == "bold"
+        expected_default_size = (
+            default_font_size + 2 if default_font_size > 0 else default_font_size - 2
+        )
+        assert int(configured_default.actual("size")) == expected_default_size
         widgets = list(_descendants(root))
         app_heading = next(
             widget
@@ -77,6 +78,9 @@ def test_gui_constructs_processes_and_switches_language(
         assert _font_size(root, app_heading) == 22
         assert _font_size(root, drop_zone) == 14
         assert _font_size(root, log) == 11
+        assert _font_weight(root, app_heading) == "bold"
+        assert _font_weight(root, drop_zone) == "bold"
+        assert _font_weight(root, log) == "bold"
 
         selector = next(
             widget for widget in widgets if isinstance(widget, ttk.Combobox)
@@ -117,6 +121,11 @@ def test_gui_constructs_processes_and_switches_language(
                     if isinstance(widget, ttk.Label) and widget.cget("font")
                 }
                 assert {12, 13, 22}.issubset(about_sizes)
+                assert all(
+                    _font_weight(root, widget) == "bold"
+                    for widget in _descendants(child)
+                    if isinstance(widget, ttk.Label) and widget.cget("font")
+                )
                 child.destroy()
         root.destroy()
 
