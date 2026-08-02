@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "smashpdf"
 dynamic = ["version"]
-description = "Local Windows PDF unlocker with optional lossless compression"
+description = "Local Windows PDF unlocker, compressor, and AES-256 protector"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

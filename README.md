@@ -4,9 +4,9 @@
   <img src="assets/smashpdf_logo.png" alt="SmashPDF official logo" width="180">
 </p>
 
-A local-first Windows tool that creates unrestricted and optionally compressed
-copies of PDFs without changing the source files. Documents and passwords stay
-on your computer.
+A local-first Windows tool that unlocks, compresses, or AES-256 encrypts PDF
+copies without changing the source files. Documents and passwords stay on your
+computer.
 
 ## Download and run
 
@@ -19,7 +19,7 @@ Each release also includes a SHA-256 checksum and CycloneDX software bill of
 materials (SBOM). Tagged release executables must pass Authenticode signing
 and GitHub build-provenance attestation before publication.
 
-Choose a processing option, then drag one or more PDFs into the drop box. You
+Choose **Unlock PDF** or **Lock PDF**, then drag one or more PDFs into the drop box. You
 can also click the box to browse. Each result is saved beside its source.
 Use the language selector to switch the interface instantly between English,
 Simplified Chinese, Traditional Chinese, Spanish, Japanese, and Korean.
@@ -28,6 +28,9 @@ language.
 
 Processing options:
 
+- **Lock PDF** applies AES-256 encryption with an opening password and disables
+  editing, copying, annotation changes, form filling, printing, and document
+  assembly in compliant PDF readers.
 - **Unlock only** keeps the original image quality.
 - Tick **Compress PDF after unlocking** to enable it.
 - **Standard compression** usually makes suitable PDFs 5-30% smaller.
@@ -46,7 +49,7 @@ Example:
 `Contract.pdf` becomes `Contract_unlocked.pdf`,
 `Contract_unlocked_compressed.pdf`, or
 `Contract_unlocked_major_compressed.pdf`, or
-`Contract_unlocked_massive_compressed.pdf`.
+`Contract_unlocked_massive_compressed.pdf`, or `Contract_locked.pdf`.
 
 If that name already exists, the tool creates `Contract_unlocked (2).pdf`.
 
@@ -57,6 +60,7 @@ If that name already exists, the tool creates `Contract_unlocked (2).pdf`.
 - Digital-signature and certification locks.
 - Multiple PDFs in one batch.
 - Existing non-signature form fields.
+- AES-256 password protection with restrictive PDF permissions.
 
 Visible digital-signature appearances are retained as stamp annotations.
 Cryptographic signature verification cannot remain valid after a PDF is
@@ -102,7 +106,12 @@ python smashpdf.py "C:\path\document.pdf" --output "C:\path\copy.pdf"
 python smashpdf.py "C:\path\document.pdf" --compression standard
 python smashpdf.py "C:\path\document.pdf" --compression major
 python smashpdf.py "C:\path\document.pdf" --compression massive
+python smashpdf.py "C:\path\document.pdf" --lock
 ```
+
+When `--lock` is used, SmashPDF prompts for the new password without displaying
+it. `--lock-password` is available for automation, but command-line arguments
+may be visible to other local processes and should be avoided on shared systems.
 
 Use `python smashpdf.py --help` for all options.
 
@@ -114,6 +123,13 @@ Use `python smashpdf.py --help` for all options.
 - Concurrent SmashPDF instances cannot replace one another's new outputs.
 - A page-count check runs after every conversion.
 - This tool does not bypass an unknown opening password.
+- Lock mode uses a securely generated owner password that is never saved and
+  verifies the AES-256 encryption and permission flags before publishing output.
+
+PDF permission flags are enforced by compliant readers, but they are not
+irreversible DRM. Someone who knows the opening password and uses specialised
+software may be able to remove the restrictions. Keep sensitive source material
+under appropriate access control as well.
 
 To verify a downloaded release:
 

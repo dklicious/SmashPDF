@@ -4,12 +4,12 @@ import os
 import sys
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from tkinter import font as tkfont
 from unittest.mock import Mock
 
 import pytest
-from pypdf import PdfReader, PdfWriter
+from pypdf import PasswordType, PdfReader, PdfWriter
 
 import smashpdf
 
@@ -90,6 +90,18 @@ def test_gui_constructs_processes_and_switches_language(
         root.update()
 
         widgets = list(_descendants(root))
+        lock_option = next(
+            widget
+            for widget in widgets
+            if isinstance(widget, ttk.Radiobutton)
+            and widget.cget("text") == "加密锁定 PDF"
+        )
+        lock_option.invoke()
+        root.update_idletasks()
+        compression_toggle = next(
+            widget for widget in widgets if isinstance(widget, ttk.Checkbutton)
+        )
+        assert str(compression_toggle.cget("state")) == "disabled"
         browse = next(
             widget
             for widget in widgets
@@ -140,11 +152,19 @@ def test_gui_constructs_processes_and_switches_language(
     )
     monkeypatch.setattr(messagebox, "showinfo", show_info)
     monkeypatch.setattr(messagebox, "showwarning", show_warning)
+    passwords = iter(("secure-password", "secure-password"))
+    monkeypatch.setattr(
+        simpledialog,
+        "askstring",
+        lambda *_args, **_kwargs: next(passwords),
+    )
     monkeypatch.setattr(smashpdf.webbrowser, "open_new_tab", open_project)
 
     assert smashpdf.run_gui() == 0
     assert smashpdf.load_language_preference(settings) == "zh"
-    assert len(PdfReader(tmp_path / "gui_unlocked.pdf").pages) == 1
+    locked = PdfReader(tmp_path / "gui_locked.pdf")
+    assert locked.decrypt("secure-password") == PasswordType.USER_PASSWORD
+    assert len(locked.pages) == 1
     show_info.assert_called_once()
     show_warning.assert_not_called()
     open_project.assert_called_once_with(smashpdf.PROJECT_URL)

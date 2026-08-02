@@ -31,6 +31,13 @@ SmashPDF does not bypass an unknown opening password. Removing a PDF's digital
 signature or certification controls invalidates cryptographic verification, so
 the original signed document should always be retained.
 
+Lock mode uses AES-256 encryption, a user-selected opening password, and a
+cryptographically random owner password that is not stored. The output is
+reopened to verify its encryption integrity, password, page count, and denied
+edit/copy/print permissions before publication. PDF permission flags depend on
+reader compliance and are not irreversible DRM when the opening password is
+known.
+
 ## Release integrity
 
 Tagged releases require:
