@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from pypdf import PdfReader, PdfWriter
+from pypdf import PasswordType, PdfReader, PdfWriter
 
 from smashpdf import build_parser, main
 
@@ -29,6 +29,52 @@ def test_cli_processes_pdf_and_reports_output(
     assert f"Created: {output}" in captured.out
     assert not captured.err
     assert len(PdfReader(output).pages) == 1
+
+
+def test_cli_locks_pdf_with_aes256(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "source.pdf"
+    output = tmp_path / "locked.pdf"
+    _blank_pdf(source)
+
+    exit_code = main(
+        [
+            str(source),
+            "--output",
+            str(output),
+            "--lock",
+            "--lock-password",
+            "secure-password",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "AES-256 encrypted" in captured.out
+    reader = PdfReader(output)
+    assert reader.decrypt("secure-password") == PasswordType.USER_PASSWORD
+    assert len(reader.pages) == 1
+
+
+def test_cli_rejects_lock_password_without_lock() -> None:
+    with pytest.raises(SystemExit, match="requires --lock"):
+        main(["document.pdf", "--lock-password", "secure-password"])
+
+
+def test_cli_rejects_compression_with_lock() -> None:
+    with pytest.raises(SystemExit, match="cannot be used"):
+        main(
+            [
+                "document.pdf",
+                "--lock",
+                "--lock-password",
+                "secure-password",
+                "--compression",
+                "major",
+            ]
+        )
 
 
 def test_cli_reports_failure_without_traceback(

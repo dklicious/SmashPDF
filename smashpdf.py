@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-"""Create editable, restriction-free and compressed copies of PDF files.
+"""Create unlocked, compressed, or AES-256 protected copies of PDF files.
 
 The source file is never modified. Password encryption is removed after the
 document has been successfully opened. Digital-signature fields and document
 certification controls are removed; visible signature appearances are retained
 as stamp annotations. Optional compression reduces embedded image resolution
 while preserving page geometry, images, and selectable text.
+Lock mode applies AES-256 encryption and restrictive PDF permission flags.
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
+import secrets
 import sys
 import tempfile
 import traceback
@@ -23,7 +26,8 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
-from pypdf import PdfReader, PdfWriter
+from pypdf import PasswordType, PdfReader, PdfWriter
+from pypdf.constants import UserAccessPermissions
 from pypdf.errors import PdfReadError
 from pypdf.generic import (
     ArrayObject,
@@ -58,6 +62,18 @@ TRANSLATIONS = {
             "Digital-signature verification will be removed from unlocked "
             "copies. Visible signature appearances are retained."
         ),
+        "lock_intro": (
+            "Drop PDF files below to protect them with AES-256 encryption. "
+            "Original files are never changed."
+        ),
+        "lock_warning": (
+            "Editing, copying and printing are disabled in compliant PDF readers. "
+            "These permissions are not irreversible DRM once the opening password "
+            "is known. Existing digital signatures may become invalid."
+        ),
+        "action": "Action",
+        "unlock_action": "Unlock PDF",
+        "lock_action": "Lock PDF",
         "processing_option": "Processing option",
         "compress_after_unlocking": "Compress PDF after unlocking",
         "standard_compression": "Standard compression - usually 5-30% smaller",
@@ -85,6 +101,12 @@ TRANSLATIONS = {
         "cancelled": "Cancelled.",
         "failed": "Failed: {error}",
         "opening_prompt": "Enter the opening password for:\n{name}",
+        "new_credential_prompt": (
+            "Create an opening password (at least 8 characters) for the locked PDF(s):"
+        ),
+        "confirm_credential_prompt": "Enter the new password again to confirm:",
+        "credential_mismatch": "The passwords do not match.",
+        "credential_too_short": "The password must contain at least 8 characters.",
         "completed_with_failures": (
             "Completed: {successes}\nFailed or cancelled: {failures}\n\n{details}"
         ),
@@ -98,6 +120,9 @@ TRANSLATIONS = {
         "encryption_removed": "encryption removed",
         "signature_fields_removed": ("{count} digital-signature field(s) removed"),
         "unrestricted_copy_created": "an unrestricted copy was created",
+        "locked_copy_created": (
+            "AES-256 encrypted; editing, copying and printing disabled"
+        ),
         "standard_result": (
             "standard lossless compression; {count} stream(s) optimized"
         ),
@@ -107,11 +132,26 @@ TRANSLATIONS = {
             "Created: {output}\nPages: {pages}; {changes}\n"
             "Size: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
         ),
+        "lock_result_summary": (
+            "Created: {output}\nPages: {pages}; {changes}\n"
+            "Size: {source_mb:.2f} MB -> {output_mb:.2f} MB"
+        ),
     },
     "zh": {
         "language": "语言",
         "intro": ("将 PDF 文件拖放到下方以解除限制。可选择压缩。原始文件不会被更改。"),
         "warning": ("解锁后的副本将移除数字签名验证。可见的签名外观会保留。"),
+        "lock_intro": (
+            "将 PDF 文件拖放到下方，使用 AES-256 加密保护。原始文件不会被更改。"
+        ),
+        "lock_warning": (
+            "兼容的 PDF 阅读器将禁止编辑、复制和打印。知道打开密码后，"
+            "这些权限并非不可逆的"
+            "数字版权保护。现有数字签名可能失效。"
+        ),
+        "action": "操作",
+        "unlock_action": "解锁 PDF",
+        "lock_action": "加密锁定 PDF",
         "processing_option": "处理选项",
         "compress_after_unlocking": "解锁后压缩 PDF",
         "standard_compression": "标准压缩 — 通常缩小 5–30%",
@@ -137,6 +177,10 @@ TRANSLATIONS = {
         "cancelled": "已取消。",
         "failed": "失败：{error}",
         "opening_prompt": "请输入以下文件的打开密码：\n{name}",
+        "new_credential_prompt": "为锁定的 PDF 创建打开密码（至少 8 个字符）：",
+        "confirm_credential_prompt": "再次输入新密码以确认：",
+        "credential_mismatch": "两次输入的密码不一致。",
+        "credential_too_short": "密码必须至少包含 8 个字符。",
         "completed_with_failures": (
             "已完成：{successes}\n失败或取消：{failures}\n\n{details}"
         ),
@@ -150,6 +194,7 @@ TRANSLATIONS = {
         "encryption_removed": "已移除加密",
         "signature_fields_removed": "已移除 {count} 个数字签名字段",
         "unrestricted_copy_created": "已创建无限制副本",
+        "locked_copy_created": "已使用 AES-256 加密；禁止编辑、复制和打印",
         "standard_result": "标准无损压缩；已优化 {count} 个数据流",
         "maximum_result": "最大无损压缩；已优化 {count} 个数据流",
         "massive_result": "超强图像压缩；已重新压缩 {count} 张图像",
@@ -157,11 +202,26 @@ TRANSLATIONS = {
             "已创建：{output}\n页数：{pages}；{changes}\n"
             "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
         ),
+        "lock_result_summary": (
+            "已创建：{output}\n页数：{pages}；{changes}\n"
+            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB"
+        ),
     },
     "zh_hant": {
         "language": "語言",
         "intro": ("將 PDF 檔案拖放到下方以解除限制。可選擇壓縮。原始檔案不會被變更。"),
         "warning": ("解鎖後的副本將移除數位簽章驗證。可見的簽章外觀會保留。"),
+        "lock_intro": (
+            "將 PDF 檔案拖放到下方，使用 AES-256 加密保護。原始檔案不會被變更。"
+        ),
+        "lock_warning": (
+            "相容的 PDF 閱讀器將禁止編輯、複製和列印。知道開啟密碼後，"
+            "這些權限並非不可逆的"
+            "數位版權保護。現有數位簽章可能失效。"
+        ),
+        "action": "操作",
+        "unlock_action": "解鎖 PDF",
+        "lock_action": "加密鎖定 PDF",
         "processing_option": "處理選項",
         "compress_after_unlocking": "解鎖後壓縮 PDF",
         "standard_compression": "標準壓縮 — 通常縮小 5–30%",
@@ -187,6 +247,10 @@ TRANSLATIONS = {
         "cancelled": "已取消。",
         "failed": "失敗：{error}",
         "opening_prompt": "請輸入以下檔案的開啟密碼：\n{name}",
+        "new_credential_prompt": "為鎖定的 PDF 建立開啟密碼（至少 8 個字元）：",
+        "confirm_credential_prompt": "再次輸入新密碼以確認：",
+        "credential_mismatch": "兩次輸入的密碼不相符。",
+        "credential_too_short": "密碼必須至少包含 8 個字元。",
         "completed_with_failures": (
             "已完成：{successes}\n失敗或取消：{failures}\n\n{details}"
         ),
@@ -200,12 +264,17 @@ TRANSLATIONS = {
         "encryption_removed": "已移除加密",
         "signature_fields_removed": "已移除 {count} 個數位簽章欄位",
         "unrestricted_copy_created": "已建立無限制副本",
+        "locked_copy_created": "已使用 AES-256 加密；禁止編輯、複製和列印",
         "standard_result": "標準無損壓縮；已最佳化 {count} 個資料流",
         "maximum_result": "最大無損壓縮；已最佳化 {count} 個資料流",
         "massive_result": "超強影像壓縮；已重新壓縮 {count} 張影像",
         "result_summary": (
             "已建立：{output}\n頁數：{pages}；{changes}\n"
             "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
+        ),
+        "lock_result_summary": (
+            "已建立：{output}\n頁數：{pages}；{changes}\n"
+            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB"
         ),
     },
     "es": {
@@ -218,6 +287,18 @@ TRANSLATIONS = {
             "La verificación de firmas digitales se eliminará de las copias "
             "desbloqueadas. La apariencia visible de las firmas se conserva."
         ),
+        "lock_intro": (
+            "Arrastra archivos PDF abajo para protegerlos con cifrado AES-256. "
+            "Los originales no se modifican."
+        ),
+        "lock_warning": (
+            "Los lectores PDF compatibles impedirán editar, copiar e imprimir. "
+            "Estos permisos no son DRM irreversible si se conoce la contraseña. "
+            "Las firmas digitales existentes pueden dejar de ser válidas."
+        ),
+        "action": "Acción",
+        "unlock_action": "Desbloquear PDF",
+        "lock_action": "Bloquear PDF",
         "processing_option": "Opción de procesamiento",
         "compress_after_unlocking": "Comprimir el PDF después de desbloquearlo",
         "standard_compression": ("Compresión estándar - normalmente 5-30% más pequeño"),
@@ -251,6 +332,12 @@ TRANSLATIONS = {
         "cancelled": "Cancelado.",
         "failed": "Error: {error}",
         "opening_prompt": "Introduce la contraseña de apertura para:\n{name}",
+        "new_credential_prompt": (
+            "Crea una contraseña de apertura (mínimo 8 caracteres) para los PDF:"
+        ),
+        "confirm_credential_prompt": "Introduce otra vez la nueva contraseña:",
+        "credential_mismatch": "Las contraseñas no coinciden.",
+        "credential_too_short": "La contraseña debe tener al menos 8 caracteres.",
         "completed_with_failures": (
             "Completados: {successes}\nFallidos o cancelados: {failures}\n\n{details}"
         ),
@@ -264,6 +351,9 @@ TRANSLATIONS = {
         "encryption_removed": "cifrado eliminado",
         "signature_fields_removed": ("{count} campo(s) de firma digital eliminado(s)"),
         "unrestricted_copy_created": "se creó una copia sin restricciones",
+        "locked_copy_created": (
+            "cifrado AES-256; edición, copia e impresión desactivadas"
+        ),
         "standard_result": (
             "compresión estándar sin pérdida; {count} flujo(s) optimizado(s)"
         ),
@@ -277,6 +367,10 @@ TRANSLATIONS = {
             "Creado: {output}\nPáginas: {pages}; {changes}\n"
             "Tamaño: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
         ),
+        "lock_result_summary": (
+            "Creado: {output}\nPáginas: {pages}; {changes}\n"
+            "Tamaño: {source_mb:.2f} MB -> {output_mb:.2f} MB"
+        ),
     },
     "ja": {
         "language": "言語",
@@ -288,6 +382,20 @@ TRANSLATIONS = {
             "解除後のコピーではデジタル署名の検証が削除されます。"
             "表示されている署名の外観は保持されます。"
         ),
+        "lock_intro": (
+            "PDF ファイルを下にドロップして AES-256 暗号化で保護します。"
+            "元のファイルは変更されません。"
+        ),
+        "lock_warning": (
+            "対応する PDF リーダーでは編集、コピー、印刷が禁止されます。"
+            "開くパスワードを知っている場合、この権限設定は不可逆の DRM "
+            "ではありません。"
+            "既存のデジタル署名は"
+            "無効になることがあります。"
+        ),
+        "action": "操作",
+        "unlock_action": "PDF の制限を解除",
+        "lock_action": "PDF をロック",
         "processing_option": "処理オプション",
         "compress_after_unlocking": "解除後に PDF を圧縮",
         "standard_compression": "標準圧縮 — 通常 5～30% 小さくなります",
@@ -318,6 +426,10 @@ TRANSLATIONS = {
         "cancelled": "キャンセルしました。",
         "failed": "失敗：{error}",
         "opening_prompt": "次のファイルを開くパスワードを入力してください：\n{name}",
+        "new_credential_prompt": "ロックする PDF のパスワードを作成（8文字以上）：",
+        "confirm_credential_prompt": "確認のため新しいパスワードを再入力：",
+        "credential_mismatch": "パスワードが一致しません。",
+        "credential_too_short": "パスワードは8文字以上にしてください。",
         "completed_with_failures": (
             "完了：{successes}\n失敗またはキャンセル：{failures}\n\n{details}"
         ),
@@ -331,12 +443,17 @@ TRANSLATIONS = {
         "encryption_removed": "暗号化を解除",
         "signature_fields_removed": "デジタル署名フィールドを {count} 個削除",
         "unrestricted_copy_created": "制限のないコピーを作成",
+        "locked_copy_created": "AES-256 暗号化済み；編集、コピー、印刷を禁止",
         "standard_result": "標準ロスレス圧縮；{count} ストリームを最適化",
         "maximum_result": "最大ロスレス圧縮；{count} ストリームを最適化",
         "massive_result": "超強力画像圧縮；{count} 個の画像を再圧縮",
         "result_summary": (
             "作成先：{output}\nページ数：{pages}；{changes}\n"
             "サイズ：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
+        ),
+        "lock_result_summary": (
+            "作成先：{output}\nページ数：{pages}；{changes}\n"
+            "サイズ：{source_mb:.2f} MB -> {output_mb:.2f} MB"
         ),
     },
     "ko": {
@@ -349,6 +466,18 @@ TRANSLATIONS = {
             "제한이 해제된 사본에서는 디지털 서명 검증이 제거됩니다. "
             "화면에 보이는 서명 모양은 유지됩니다."
         ),
+        "lock_intro": (
+            "PDF 파일을 아래에 놓아 AES-256 암호화로 보호하세요. "
+            "원본 파일은 변경되지 않습니다."
+        ),
+        "lock_warning": (
+            "호환 PDF 리더에서는 편집, 복사 및 인쇄가 금지됩니다. "
+            "열기 암호를 알고 있다면 이 권한은 "
+            "되돌릴 수 없는 DRM이 아닙니다. 기존 디지털 서명이 무효화될 수 있습니다."
+        ),
+        "action": "작업",
+        "unlock_action": "PDF 제한 해제",
+        "lock_action": "PDF 잠금",
         "processing_option": "처리 옵션",
         "compress_after_unlocking": "제한 해제 후 PDF 압축",
         "standard_compression": "표준 압축 — 일반적으로 5~30% 축소",
@@ -380,6 +509,10 @@ TRANSLATIONS = {
         "cancelled": "취소되었습니다.",
         "failed": "실패: {error}",
         "opening_prompt": "다음 파일의 열기 암호를 입력하세요:\n{name}",
+        "new_credential_prompt": "잠글 PDF의 열기 암호를 만드세요(8자 이상):",
+        "confirm_credential_prompt": "새 암호를 다시 입력하여 확인하세요:",
+        "credential_mismatch": "암호가 일치하지 않습니다.",
+        "credential_too_short": "암호는 8자 이상이어야 합니다.",
         "completed_with_failures": (
             "완료: {successes}\n실패 또는 취소: {failures}\n\n{details}"
         ),
@@ -393,12 +526,17 @@ TRANSLATIONS = {
         "encryption_removed": "암호화 제거됨",
         "signature_fields_removed": "디지털 서명 필드 {count}개 제거됨",
         "unrestricted_copy_created": "제한 없는 사본 생성됨",
+        "locked_copy_created": "AES-256 암호화됨; 편집, 복사 및 인쇄 금지",
         "standard_result": "표준 무손실 압축; 스트림 {count}개 최적화됨",
         "maximum_result": "최대 무손실 압축; 스트림 {count}개 최적화됨",
         "massive_result": "초강력 이미지 압축; 이미지 {count}개 재압축됨",
         "result_summary": (
             "생성됨: {output}\n페이지: {pages}; {changes}\n"
             "크기: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
+        ),
+        "lock_result_summary": (
+            "생성됨: {output}\n페이지: {pages}; {changes}\n"
+            "크기: {source_mb:.2f} MB -> {output_mb:.2f} MB"
         ),
     },
 }
@@ -444,6 +582,52 @@ class UnlockResult:
         if not self.source_size:
             return 0.0
         return (1 - self.output_size / self.source_size) * 100
+
+
+@dataclass(frozen=True)
+class LockResult:
+    source: Path
+    output: Path
+    page_count: int
+    was_encrypted: bool
+    source_size: int
+    output_size: int
+
+
+LOCKED_PERMISSIONS = (
+    UserAccessPermissions.R7
+    | UserAccessPermissions.R8
+    | UserAccessPermissions.R13
+    | UserAccessPermissions.R14
+    | UserAccessPermissions.R15
+    | UserAccessPermissions.R16
+    | UserAccessPermissions.R17
+    | UserAccessPermissions.R18
+    | UserAccessPermissions.R19
+    | UserAccessPermissions.R20
+    | UserAccessPermissions.R21
+    | UserAccessPermissions.R22
+    | UserAccessPermissions.R23
+    | UserAccessPermissions.R24
+    | UserAccessPermissions.R25
+    | UserAccessPermissions.R26
+    | UserAccessPermissions.R27
+    | UserAccessPermissions.R28
+    | UserAccessPermissions.R29
+    | UserAccessPermissions.R30
+    | UserAccessPermissions.R31
+    | UserAccessPermissions.R32
+)
+USER_ACTION_PERMISSIONS = (
+    UserAccessPermissions.PRINT
+    | UserAccessPermissions.MODIFY
+    | UserAccessPermissions.EXTRACT
+    | UserAccessPermissions.ADD_OR_MODIFY
+    | UserAccessPermissions.FILL_FORM_FIELDS
+    | UserAccessPermissions.EXTRACT_TEXT_AND_GRAPHICS
+    | UserAccessPermissions.ASSEMBLE_DOC
+    | UserAccessPermissions.PRINT_TO_REPRESENTATION
+)
 
 
 def _format_size_change(result: UnlockResult, language: str = "en") -> str:
@@ -724,6 +908,19 @@ def default_output_path(source: Path, compression: str = "none") -> Path:
         number += 1
 
 
+def default_lock_output_path(source: Path) -> Path:
+    base = source.with_name(f"{source.stem}_locked{source.suffix}")
+    if not base.exists():
+        return base
+
+    number = 2
+    while True:
+        candidate = source.with_name(f"{source.stem}_locked ({number}){source.suffix}")
+        if not candidate.exists():
+            return candidate
+        number += 1
+
+
 def _publish_without_overwrite(temp_path: Path, output_path: Path) -> None:
     """Atomically publish a file while refusing to replace an existing path."""
 
@@ -895,6 +1092,104 @@ def _validate_output(output: Path, expected_pages: int) -> None:
         )
 
 
+def _validate_locked_output(
+    output: Path,
+    expected_pages: int,
+    user_password: str,
+) -> None:
+    check = PdfReader(str(output))
+    if not check.is_encrypted:
+        raise RuntimeError("The output is unexpectedly not encrypted.")
+    if check.decrypt(user_password) != PasswordType.USER_PASSWORD:
+        raise RuntimeError("The output cannot be opened with the chosen password.")
+    if not check.are_permissions_valid:
+        raise RuntimeError("The encrypted permission data failed its integrity check.")
+    if len(check.pages) != expected_pages:
+        raise RuntimeError(
+            f"Page count changed from {expected_pages} to {len(check.pages)}."
+        )
+    permissions = check.user_access_permissions
+    if permissions is None or permissions & USER_ACTION_PERMISSIONS:
+        raise RuntimeError("Editing restrictions were not applied correctly.")
+
+
+def lock_pdf(
+    source: str | Path,
+    user_password: str,
+    *,
+    source_password: str | None = None,
+    output: str | Path | None = None,
+    overwrite: bool = False,
+) -> LockResult:
+    """Create an AES-256 encrypted, permission-restricted copy of a PDF."""
+
+    if len(user_password) < 8:
+        raise ValueError("The new password must contain at least 8 characters.")
+
+    source_path = Path(source).expanduser().resolve()
+    if not source_path.is_file():
+        raise FileNotFoundError(f"PDF not found: {source_path}")
+    if source_path.suffix.lower() != ".pdf":
+        raise ValueError(f"Not a PDF file: {source_path}")
+
+    automatic_output = output is None
+    output_path = (
+        Path(output).expanduser().resolve()
+        if output is not None
+        else default_lock_output_path(source_path)
+    )
+    if output_path == source_path:
+        raise ValueError("The output must be different from the source PDF.")
+    if output_path.exists() and not overwrite:
+        raise FileExistsError(f"Output already exists: {output_path}")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    reader, was_encrypted = _open_reader(source_path, source_password)
+    expected_pages = len(reader.pages)
+    writer = PdfWriter(clone_from=reader)
+    writer.encrypt(
+        user_password=user_password,
+        owner_password=secrets.token_urlsafe(48),
+        permissions_flag=LOCKED_PERMISSIONS,
+        algorithm="AES-256",
+    )
+
+    temp_fd, temp_name = tempfile.mkstemp(
+        prefix=f".{output_path.stem}-",
+        suffix=".tmp.pdf",
+        dir=str(output_path.parent),
+    )
+    os.close(temp_fd)
+    temp_path = Path(temp_name)
+
+    try:
+        writer.write(str(temp_path))
+        _validate_locked_output(temp_path, expected_pages, user_password)
+        if overwrite:
+            os.replace(temp_path, output_path)
+        else:
+            while True:
+                try:
+                    _publish_without_overwrite(temp_path, output_path)
+                    break
+                except FileExistsError:
+                    if not automatic_output:
+                        raise
+                    output_path = default_lock_output_path(source_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+    return LockResult(
+        source=source_path,
+        output=output_path,
+        page_count=expected_pages,
+        was_encrypted=was_encrypted,
+        source_size=source_path.stat().st_size,
+        output_size=output_path.stat().st_size,
+    )
+
+
 def unlock_pdf(
     source: str | Path,
     *,
@@ -1005,6 +1300,16 @@ def _format_result(result: UnlockResult) -> str:
     )
 
 
+def _format_lock_result(result: LockResult) -> str:
+    return (
+        f"Created: {result.output}\n"
+        f"Pages: {result.page_count}; AES-256 encrypted; editing, copying and "
+        "printing disabled\n"
+        f"Size: {result.source_size / 1_048_576:.2f} MB -> "
+        f"{result.output_size / 1_048_576:.2f} MB"
+    )
+
+
 def _increase_named_font_sizes(root, increase: int = 2) -> None:
     """Increase every Tk named font and apply a bold, high-visibility weight."""
     from tkinter import font as tkfont
@@ -1111,10 +1416,30 @@ def run_gui() -> int:
     )
     warning_label.pack(anchor="w", pady=(0, 14))
 
+    action_mode = tk.StringVar(value="unlock")
     compression_enabled = tk.BooleanVar(value=False)
     compression_level = tk.StringVar(value="standard")
     options = ttk.LabelFrame(outer, text=tr("processing_option"), padding=10)
     options.pack(fill="x", pady=(0, 14))
+
+    action_label = ttk.Label(options, text=tr("action"))
+    action_label.pack(anchor="w")
+    unlock_radio = ttk.Radiobutton(
+        options,
+        text=tr("unlock_action"),
+        variable=action_mode,
+        value="unlock",
+        command=lambda: update_compression_controls(),
+    )
+    unlock_radio.pack(anchor="w", padx=(22, 0), pady=2)
+    lock_radio = ttk.Radiobutton(
+        options,
+        text=tr("lock_action"),
+        variable=action_mode,
+        value="lock",
+        command=lambda: update_compression_controls(),
+    )
+    lock_radio.pack(anchor="w", padx=(22, 0), pady=(2, 8))
 
     compression_check = ttk.Checkbutton(
         options,
@@ -1158,7 +1483,9 @@ def run_gui() -> int:
     quality_label.pack(anchor="w", pady=(5, 0))
 
     def update_compression_controls() -> None:
-        state = "normal" if compression_enabled.get() else "disabled"
+        unlocking = action_mode.get() == "unlock"
+        compression_check.configure(state="normal" if unlocking else "disabled")
+        state = "normal" if unlocking and compression_enabled.get() else "disabled"
         standard_radio.configure(state=state)
         major_radio.configure(state=state)
         massive_radio.configure(state=state)
@@ -1168,6 +1495,8 @@ def run_gui() -> int:
             else "no_quality_removed"
         )
         quality_label.configure(text=tr(warning_key))
+        intro_label.configure(text=tr("intro" if unlocking else "lock_intro"))
+        warning_label.configure(text=tr("warning" if unlocking else "lock_warning"))
 
     update_compression_controls()
 
@@ -1236,6 +1565,16 @@ def run_gui() -> int:
             size_change=_format_size_change(result, language_code.get()),
         )
 
+    def format_gui_lock_result(result: LockResult) -> str:
+        return tr(
+            "lock_result_summary",
+            output=result.output,
+            pages=result.page_count,
+            changes=tr("locked_copy_created"),
+            source_mb=result.source_size / 1_048_576,
+            output_mb=result.output_size / 1_048_576,
+        )
+
     def process_files(filenames) -> None:
         pdf_files = []
         for filename in filenames:
@@ -1253,7 +1592,44 @@ def run_gui() -> int:
             )
             return
 
-        selected_mode = compression_level.get() if compression_enabled.get() else "none"
+        selected_action = action_mode.get()
+        selected_mode = (
+            compression_level.get()
+            if selected_action == "unlock" and compression_enabled.get()
+            else "none"
+        )
+        new_password = None
+        if selected_action == "lock":
+            new_password = simpledialog.askstring(
+                APP_NAME,
+                tr("new_credential_prompt"),
+                parent=root,
+                show="*",
+            )
+            if new_password is None:
+                return
+            if len(new_password) < 8:
+                messagebox.showwarning(
+                    APP_NAME,
+                    tr("credential_too_short"),
+                    parent=root,
+                )
+                return
+            confirmation = simpledialog.askstring(
+                APP_NAME,
+                tr("confirm_credential_prompt"),
+                parent=root,
+                show="*",
+            )
+            if confirmation is None:
+                return
+            if confirmation != new_password:
+                messagebox.showwarning(
+                    APP_NAME,
+                    tr("credential_mismatch"),
+                    parent=root,
+                )
+                return
         choose_button.configure(state="disabled")
         drop_zone.configure(
             text=tr("processing_files", count=len(pdf_files)),
@@ -1267,7 +1643,10 @@ def run_gui() -> int:
             for source in pdf_files:
                 append_log(tr("processing_file", name=source.name))
                 try:
-                    result = unlock_pdf(source, compression=selected_mode)
+                    if selected_action == "lock":
+                        result = lock_pdf(source, new_password or "")
+                    else:
+                        result = unlock_pdf(source, compression=selected_mode)
                 except PasswordRequiredError:
                     password = simpledialog.askstring(
                         APP_NAME,
@@ -1280,11 +1659,18 @@ def run_gui() -> int:
                         append_log(tr("cancelled"))
                         continue
                     try:
-                        result = unlock_pdf(
-                            source,
-                            password=password,
-                            compression=selected_mode,
-                        )
+                        if selected_action == "lock":
+                            result = lock_pdf(
+                                source,
+                                new_password or "",
+                                source_password=password,
+                            )
+                        else:
+                            result = unlock_pdf(
+                                source,
+                                password=password,
+                                compression=selected_mode,
+                            )
                     except Exception as exc:
                         failures.append(f"{source.name}: {exc}")
                         append_log(tr("failed", error=exc))
@@ -1295,7 +1681,10 @@ def run_gui() -> int:
                     continue
 
                 successes += 1
-                append_log(format_gui_result(result))
+                if isinstance(result, LockResult):
+                    append_log(format_gui_lock_result(result))
+                else:
+                    append_log(format_gui_result(result))
         finally:
             choose_button.configure(state="normal")
             drop_zone.configure(
@@ -1420,6 +1809,9 @@ def run_gui() -> int:
         intro_label.configure(text=tr("intro"))
         warning_label.configure(text=tr("warning"))
         options.configure(text=tr("processing_option"))
+        action_label.configure(text=tr("action"))
+        unlock_radio.configure(text=tr("unlock_action"))
+        lock_radio.configure(text=tr("lock_action"))
         compression_check.configure(text=tr("compress_after_unlocking"))
         standard_radio.configure(text=tr("standard_compression"))
         major_radio.configure(text=tr("maximum_compression"))
@@ -1450,7 +1842,8 @@ def run_gui() -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Create unrestricted PDF copies without modifying the source files."
+            "Create unrestricted or AES-256 locked PDF copies without modifying "
+            "the source files."
         )
     )
     parser.add_argument("files", nargs="*", help="PDF files to unlock")
@@ -1468,6 +1861,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--overwrite",
         action="store_true",
         help="Allow replacement of an explicitly selected output file",
+    )
+    parser.add_argument(
+        "--lock",
+        action="store_true",
+        help="Create an AES-256 encrypted copy with editing disabled",
+    )
+    parser.add_argument(
+        "--lock-password",
+        help=(
+            "New opening password for --lock; omit to enter it securely at the prompt"
+        ),
     )
     parser.add_argument(
         "--compression",
@@ -1492,18 +1896,41 @@ def main(argv: list[str] | None = None) -> int:
         return run_gui()
     if args.output and len(args.files) != 1:
         raise SystemExit("--output can only be used with one input PDF.")
+    if args.lock_password and not args.lock:
+        raise SystemExit("--lock-password requires --lock.")
+    if args.lock and args.compression != "none":
+        raise SystemExit("--compression cannot be used with --lock.")
+
+    lock_password = args.lock_password
+    if args.lock and lock_password is None:
+        lock_password = getpass.getpass("New PDF opening password: ")
+        confirmation = getpass.getpass("Confirm new PDF opening password: ")
+        if lock_password != confirmation:
+            raise SystemExit("The new passwords do not match.")
+    if args.lock and len(lock_password or "") < 8:
+        raise SystemExit("The new password must contain at least 8 characters.")
 
     exit_code = 0
     for filename in args.files:
         try:
-            result = unlock_pdf(
-                filename,
-                password=args.password,
-                output=args.output,
-                overwrite=args.overwrite,
-                compression=args.compression,
-            )
-            print(_format_result(result))
+            if args.lock:
+                result = lock_pdf(
+                    filename,
+                    lock_password or "",
+                    source_password=args.password,
+                    output=args.output,
+                    overwrite=args.overwrite,
+                )
+                print(_format_lock_result(result))
+            else:
+                result = unlock_pdf(
+                    filename,
+                    password=args.password,
+                    output=args.output,
+                    overwrite=args.overwrite,
+                    compression=args.compression,
+                )
+                print(_format_result(result))
         except Exception as exc:
             exit_code = 1
             print(f"Failed: {filename}\n{exc}", file=sys.stderr)

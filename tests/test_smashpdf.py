@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 from PIL import Image
-from pypdf import PdfReader, PdfWriter
+from pypdf import PasswordType, PdfReader, PdfWriter
 from pypdf.constants import UserAccessPermissions
 from pypdf.errors import PdfReadError
 from pypdf.generic import (
@@ -25,13 +25,18 @@ from _version import __version__
 from smashpdf import (
     APP_VERSION,
     LANGUAGE_NAMES,
+    LOCKED_PERMISSIONS,
     TRANSLATIONS,
+    USER_ACTION_PERMISSIONS,
+    LockResult,
     PasswordRequiredError,
     UnlockResult,
     _format_result,
     _format_size_change,
+    default_lock_output_path,
     default_output_path,
     load_language_preference,
+    lock_pdf,
     save_language_preference,
     unlock_pdf,
 )
@@ -148,6 +153,86 @@ def test_default_output_path_uses_next_available_name(tmp_path: Path) -> None:
     second.touch()
 
     assert default_output_path(source) == tmp_path / "Document_unlocked (3).PDF"
+
+
+def test_default_lock_output_path_uses_next_available_name(tmp_path: Path) -> None:
+    source = tmp_path / "Document.PDF"
+    _blank_pdf(source)
+    (tmp_path / "Document_locked.PDF").touch()
+    (tmp_path / "Document_locked (2).PDF").touch()
+
+    assert default_lock_output_path(source) == tmp_path / "Document_locked (3).PDF"
+
+
+def test_lock_pdf_uses_aes256_and_disables_user_actions(tmp_path: Path) -> None:
+    source = tmp_path / "contract.pdf"
+    _blank_pdf(source)
+    source_hash = _sha256(source)
+
+    result = lock_pdf(source, "correct horse battery staple")
+
+    assert isinstance(result, LockResult)
+    assert result.output == tmp_path / "contract_locked.pdf"
+    assert _sha256(source) == source_hash
+
+    reader = PdfReader(result.output)
+    assert reader.is_encrypted
+    assert reader.decrypt("incorrect") == PasswordType.NOT_DECRYPTED
+    assert reader.decrypt("correct horse battery staple") == PasswordType.USER_PASSWORD
+    assert reader.are_permissions_valid
+    assert len(reader.pages) == 1
+    assert reader.user_access_permissions == LOCKED_PERMISSIONS
+    assert not reader.user_access_permissions & USER_ACTION_PERMISSIONS
+    encryption = reader.trailer["/Encrypt"]
+    assert encryption["/V"] == 5
+    assert encryption["/R"] == 6
+    assert encryption["/Length"] == 256
+
+
+def test_lock_pdf_requires_a_reasonable_password(tmp_path: Path) -> None:
+    source = tmp_path / "contract.pdf"
+    _blank_pdf(source)
+
+    with pytest.raises(ValueError, match="at least 8"):
+        lock_pdf(source, "short")
+
+    assert not (tmp_path / "contract_locked.pdf").exists()
+
+
+def test_lock_preserves_metadata_attachments_and_form_fields(tmp_path: Path) -> None:
+    source = tmp_path / "records.pdf"
+    output = tmp_path / "secured.pdf"
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+    widget = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Annot"),
+            NameObject("/Subtype"): NameObject("/Widget"),
+            NameObject("/FT"): NameObject("/Tx"),
+            NameObject("/T"): TextStringObject("TenantName"),
+            NameObject("/V"): TextStringObject("Example Tenant"),
+            NameObject("/Rect"): ArrayObject(
+                [FloatObject(72), FloatObject(700), FloatObject(300), FloatObject(730)]
+            ),
+            NameObject("/P"): page.indirect_reference,
+        }
+    )
+    widget_ref = writer._add_object(widget)
+    page[NameObject("/Annots")] = ArrayObject([widget_ref])
+    writer.root_object[NameObject("/AcroForm")] = writer._add_object(
+        DictionaryObject({NameObject("/Fields"): ArrayObject([widget_ref])})
+    )
+    writer.add_metadata({"/Title": "Important contract"})
+    writer.add_attachment("evidence.txt", b"retained attachment")
+    writer.write(source)
+
+    lock_pdf(source, "secure-password", output=output)
+
+    reader = PdfReader(output)
+    assert reader.decrypt("secure-password") == PasswordType.USER_PASSWORD
+    assert reader.metadata.title == "Important contract"
+    assert reader.attachments["evidence.txt"] == [b"retained attachment"]
+    assert reader.get_fields()["TenantName"]["/V"] == "Example Tenant"
 
 
 def test_explicit_output_created_during_processing_is_not_overwritten(
