@@ -5,13 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "smashpdf"
 dynamic = ["version"]
-description = "Local Windows PDF unlocker, compressor, and AES-256 protector"
+description = "Local Windows PDF and picture compression and protection tool"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "dklicious" }]
 dependencies = [
-  "pypdf[crypto]==6.14.2",
+  "pillow==12.3.0",
+  "pypdf[crypto]==6.15.0",
   "tkinterdnd2==0.6.2",
 ]
 

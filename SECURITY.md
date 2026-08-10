@@ -38,6 +38,11 @@ edit/copy/print permissions before publication. PDF permission flags depend on
 reader compliance and are not irreversible DRM when the opening password is
 known.
 
+Picture compression limits total decoded pixels to reduce decompression-bomb
+risk. Results are reopened and checked for a smaller file size, unchanged file
+format, valid dimensions, and unchanged animation frame count before atomic
+publication.
+
 ## Release integrity
 
 Tagged releases require:

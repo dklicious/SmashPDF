@@ -24,15 +24,19 @@ from pypdf.generic import (
 from _version import __version__
 from smashpdf import (
     APP_VERSION,
+    IMAGE_COMPRESSION_PROFILES,
     LANGUAGE_NAMES,
     LOCKED_PERMISSIONS,
     TRANSLATIONS,
     USER_ACTION_PERMISSIONS,
+    ImageCompressionResult,
     LockResult,
     PasswordRequiredError,
     UnlockResult,
     _format_result,
     _format_size_change,
+    compress_image,
+    default_image_output_path,
     default_lock_output_path,
     default_output_path,
     load_language_preference,
@@ -162,6 +166,149 @@ def test_default_lock_output_path_uses_next_available_name(tmp_path: Path) -> No
     (tmp_path / "Document_locked (2).PDF").touch()
 
     assert default_lock_output_path(source) == tmp_path / "Document_locked (3).PDF"
+
+
+def test_default_image_output_path_uses_next_available_name(tmp_path: Path) -> None:
+    source = tmp_path / "Photo.JPG"
+    Image.new("RGB", (100, 100), "red").save(source)
+    (tmp_path / "Photo_compressed.JPG").touch()
+    (tmp_path / "Photo_compressed (2).JPG").touch()
+
+    assert default_image_output_path(source) == tmp_path / "Photo_compressed (3).JPG"
+
+
+@pytest.mark.parametrize(
+    ("extension", "image_format"),
+    [
+        ("jpg", "JPEG"),
+        ("png", "PNG"),
+        ("webp", "WEBP"),
+        ("bmp", "BMP"),
+        ("tiff", "TIFF"),
+    ],
+)
+def test_compress_image_preserves_format_and_source(
+    tmp_path: Path,
+    extension: str,
+    image_format: str,
+) -> None:
+    source = tmp_path / f"photo.{extension}"
+    image = Image.effect_noise((1600, 1200), 100).convert("RGB")
+    save_options = {"quality": 95} if image_format in {"JPEG", "WEBP"} else {}
+    image.save(source, image_format, **save_options)
+    source_hash = _sha256(source)
+
+    result = compress_image(source, compression="major")
+
+    assert isinstance(result, ImageCompressionResult)
+    assert result.output.parent == source.parent
+    assert result.output.name == f"photo_compressed.{extension}"
+    assert result.compression_mode in IMAGE_COMPRESSION_PROFILES
+    assert result.reduction_percent > 0
+    assert result.output_size < result.source_size
+    assert _sha256(source) == source_hash
+    with Image.open(result.output) as compressed:
+        assert compressed.format == image_format
+        assert compressed.size == image.size
+
+
+def test_compress_image_preserves_animation_frames(tmp_path: Path) -> None:
+    source = tmp_path / "animation.gif"
+    frames = [
+        Image.effect_noise((600, 400), amount).convert("RGB")
+        for amount in (60, 90, 120)
+    ]
+    frames[0].save(
+        source,
+        save_all=True,
+        append_images=frames[1:],
+        duration=[100, 200, 300],
+        loop=0,
+    )
+
+    result = compress_image(source, compression="major")
+
+    with Image.open(result.output) as compressed:
+        assert result.frame_count == 3
+        assert compressed.n_frames == 3
+        assert compressed.info["loop"] == 0
+
+
+def test_image_compression_preserves_transparency_and_metadata(
+    tmp_path: Path,
+) -> None:
+    transparent_source = tmp_path / "transparent.png"
+    transparent = Image.effect_noise((1200, 900), 100).convert("RGBA")
+    transparent.putalpha(Image.linear_gradient("L").resize(transparent.size))
+    transparent.save(transparent_source, "PNG")
+
+    transparent_result = compress_image(
+        transparent_source,
+        compression="massive",
+    )
+    with Image.open(transparent_result.output) as compressed:
+        alpha = compressed.convert("RGBA").getchannel("A")
+        assert alpha.getextrema()[0] < 255
+        assert alpha.getextrema()[1] > alpha.getextrema()[0]
+        assert max(compressed.size) <= 1600
+
+    jpeg_source = tmp_path / "metadata.jpg"
+    exif = Image.Exif()
+    exif[270] = "SmashPDF metadata test"
+    Image.effect_noise((1600, 1200), 100).convert("RGB").save(
+        jpeg_source,
+        "JPEG",
+        quality=95,
+        exif=exif,
+    )
+
+    jpeg_result = compress_image(jpeg_source, compression="standard")
+    with Image.open(jpeg_result.output) as compressed:
+        assert compressed.getexif()[270] == "SmashPDF metadata test"
+
+
+def test_massive_image_compression_limits_dimensions(tmp_path: Path) -> None:
+    source = tmp_path / "large.jpg"
+    Image.effect_noise((3200, 2400), 100).convert("RGB").save(
+        source,
+        "JPEG",
+        quality=95,
+    )
+
+    result = compress_image(source, compression="massive")
+
+    with Image.open(result.output) as compressed:
+        assert max(compressed.size) <= 1600
+        assert result.reduction_percent > 50
+
+
+def test_compress_image_rejects_unsupported_and_unchanged_output(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "picture.png"
+    Image.new("RGB", (1, 1), "red").save(source)
+
+    with pytest.raises(RuntimeError, match="already optimised"):
+        compress_image(source)
+    assert not (tmp_path / "picture_compressed.png").exists()
+
+    unsupported = tmp_path / "picture.svg"
+    unsupported.write_text("<svg/>", encoding="utf-8")
+    with pytest.raises(ValueError, match="Unsupported image"):
+        compress_image(unsupported)
+
+
+def test_compress_image_rejects_excessive_total_pixels(tmp_path: Path) -> None:
+    source = tmp_path / "many-pixels.png"
+    Image.new("RGB", (20, 20), "red").save(source)
+
+    with (
+        patch("smashpdf.MAX_TOTAL_IMAGE_PIXELS", 100),
+        pytest.raises(Image.DecompressionBombError, match="too large"),
+    ):
+        compress_image(source)
+
+    assert not (tmp_path / "many-pixels_compressed.png").exists()
 
 
 def test_lock_pdf_uses_aes256_and_disables_user_actions(tmp_path: Path) -> None:
