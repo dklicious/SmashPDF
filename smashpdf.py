@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create unlocked, compressed, or AES-256 protected copies of PDF files.
+"""Create protected or compressed copies of local PDF and picture files.
 
 The source file is never modified. Password encryption is removed after the
 document has been successfully opened. Digital-signature fields and document
@@ -7,6 +7,7 @@ certification controls are removed; visible signature appearances are retained
 as stamp annotations. Optional compression reduces embedded image resolution
 while preserving page geometry, images, and selectable text.
 Lock mode applies AES-256 encryption and restrictive PDF permission flags.
+Picture mode compresses common raster formats while preserving the source file.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ import secrets
 import sys
 import tempfile
 import traceback
+import warnings
 import webbrowser
 import zlib
 from collections.abc import Iterable
@@ -540,6 +542,221 @@ TRANSLATIONS = {
         ),
     },
 }
+IMAGE_TRANSLATIONS = {
+    "en": {
+        "image_action": "Compress Images",
+        "image_intro": (
+            "Drop pictures below to make smaller copies. Originals are never changed, "
+            "and results are saved in the same folder."
+        ),
+        "image_warning": (
+            "Supports JPEG, PNG, WebP, GIF, BMP and TIFF. Stronger settings may "
+            "reduce dimensions or image quality. Animation frames are preserved."
+        ),
+        "image_standard_compression": "Standard - keeps original dimensions",
+        "image_maximum_compression": "Strong - may resize very large pictures",
+        "image_massive_compression": "Maximum - smallest picture files",
+        "image_standard_quality": (
+            "Keeps original dimensions and uses efficient encoding with mild "
+            "quality loss."
+        ),
+        "image_major_quality": (
+            "Limits very large pictures to 2560 px and uses stronger compression."
+        ),
+        "image_massive_quality": (
+            "Limits pictures to 1600 px and uses the strongest quality reduction."
+        ),
+        "image_drop_files": ("DROP PICTURE FILES HERE\n\nor click this box to browse"),
+        "image_choose_files": "CLICK HERE TO CHOOSE PICTURE FILES",
+        "processing_images": "PROCESSING {count} PICTURE FILE(S)...",
+        "image_browse_files": "Browse Picture Files",
+        "image_select_title": "Select pictures for SmashPDF",
+        "image_files": "Picture files",
+        "skipped_not_image": "Skipped (unsupported picture): {name}",
+        "no_image": "No supported picture files were found.",
+        "finished_images": "Finished. Created {successes} compressed picture(s).",
+        "image_result_summary": (
+            "Created: {output}\nFrames: {frames}; {profile}\n"
+            "Size: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
+        ),
+    },
+    "zh": {
+        "image_action": "压缩图片",
+        "image_intro": "".join(
+            (
+                "将图片拖放到下方以创建更小的副本。原图不会被更改，",
+                "结果保存在同一文件夹。",
+            )
+        ),
+        "image_warning": (
+            "支持 JPEG、PNG、WebP、GIF、BMP 和 TIFF。较强的设置可能降低尺寸或画质。"
+            "动画帧会被保留。"
+        ),
+        "image_standard_compression": "标准 - 保持原始尺寸",
+        "image_maximum_compression": "强力 - 可能缩小超大图片",
+        "image_massive_compression": "最大 - 图片文件尽可能小",
+        "image_standard_quality": "保持原始尺寸并使用高效编码，画质仅轻微降低。",
+        "image_major_quality": "将超大图片限制为 2560 像素，并使用更强压缩。",
+        "image_massive_quality": (
+            "将图片限制为 1600 像素，并最大程度降低画质以减小文件。"
+        ),
+        "image_drop_files": "将图片文件拖放到这里\n\n或单击此框浏览文件",
+        "image_choose_files": "单击此处选择图片文件",
+        "processing_images": "正在处理 {count} 个图片文件...",
+        "image_browse_files": "浏览图片文件",
+        "image_select_title": "选择要用 SmashPDF 压缩的图片",
+        "image_files": "图片文件",
+        "skipped_not_image": "已跳过（不支持的图片）：{name}",
+        "no_image": "未找到支持的图片文件。",
+        "finished_images": "处理完成。已创建 {successes} 个压缩图片。",
+        "image_result_summary": (
+            "已创建：{output}\n帧数：{frames}；{profile}\n"
+            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
+        ),
+    },
+    "zh_hant": {
+        "image_action": "壓縮圖片",
+        "image_intro": "".join(
+            (
+                "將圖片拖放到下方以建立較小的副本。原圖不會被變更，",
+                "結果儲存在同一資料夾。",
+            )
+        ),
+        "image_warning": (
+            "支援 JPEG、PNG、WebP、GIF、BMP 和 TIFF。較強的設定可能降低尺寸或畫質。"
+            "動畫影格會被保留。"
+        ),
+        "image_standard_compression": "標準 - 保持原始尺寸",
+        "image_maximum_compression": "強力 - 可能縮小超大圖片",
+        "image_massive_compression": "最大 - 圖片檔案盡可能小",
+        "image_standard_quality": "保持原始尺寸並使用高效編碼，畫質僅輕微降低。",
+        "image_major_quality": "將超大圖片限制為 2560 像素，並使用更強壓縮。",
+        "image_massive_quality": (
+            "將圖片限制為 1600 像素，並最大程度降低畫質以縮小檔案。"
+        ),
+        "image_drop_files": "將圖片檔案拖放到這裡\n\n或按一下此方塊瀏覽檔案",
+        "image_choose_files": "按一下此處選擇圖片檔案",
+        "processing_images": "正在處理 {count} 個圖片檔案...",
+        "image_browse_files": "瀏覽圖片檔案",
+        "image_select_title": "選擇要用 SmashPDF 壓縮的圖片",
+        "image_files": "圖片檔案",
+        "skipped_not_image": "已略過（不支援的圖片）：{name}",
+        "no_image": "找不到支援的圖片檔案。",
+        "finished_images": "處理完成。已建立 {successes} 個壓縮圖片。",
+        "image_result_summary": (
+            "已建立：{output}\n影格數：{frames}；{profile}\n"
+            "大小：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
+        ),
+    },
+    "es": {
+        "image_action": "Comprimir imágenes",
+        "image_intro": (
+            "Arrastra imágenes abajo para crear copias más pequeñas. Los originales "
+            "no se modifican y los resultados se guardan en la misma carpeta."
+        ),
+        "image_warning": (
+            "Admite JPEG, PNG, WebP, GIF, BMP y TIFF. Los ajustes más fuertes pueden "
+            "reducir las dimensiones o la calidad. Se conservan los fotogramas."
+        ),
+        "image_standard_compression": "Estándar - conserva las dimensiones",
+        "image_maximum_compression": "Fuerte - puede reducir imágenes muy grandes",
+        "image_massive_compression": "Máxima - archivos de imagen más pequeños",
+        "image_standard_quality": (
+            "Conserva las dimensiones y usa codificación eficiente con pérdida leve."
+        ),
+        "image_major_quality": (
+            "Limita las imágenes muy grandes a 2560 px y aplica más compresión."
+        ),
+        "image_massive_quality": (
+            "Limita las imágenes a 1600 px y aplica la mayor reducción de calidad."
+        ),
+        "image_drop_files": "ARRASTRA LAS IMÁGENES AQUÍ\n\no haz clic para buscarlas",
+        "image_choose_files": "HAZ CLIC AQUÍ PARA ELEGIR IMÁGENES",
+        "processing_images": "PROCESANDO {count} IMAGEN(ES)...",
+        "image_browse_files": "Buscar imágenes",
+        "image_select_title": "Seleccionar imágenes para SmashPDF",
+        "image_files": "Archivos de imagen",
+        "skipped_not_image": "Omitido (imagen no compatible): {name}",
+        "no_image": "No se encontraron archivos de imagen compatibles.",
+        "finished_images": (
+            "Terminado. Se crearon {successes} imagen(es) comprimida(s)."
+        ),
+        "image_result_summary": (
+            "Creado: {output}\nFotogramas: {frames}; {profile}\n"
+            "Tamaño: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
+        ),
+    },
+    "ja": {
+        "image_action": "画像を圧縮",
+        "image_intro": (
+            "画像を下にドロップして小さいコピーを作成します。元の画像は変更されず、"
+            "結果は同じフォルダーに保存されます。"
+        ),
+        "image_warning": (
+            "JPEG、PNG、WebP、GIF、BMP、TIFF に対応します。強い設定ではサイズや画質が"
+            "低下する場合があります。アニメーションのフレームは保持されます。"
+        ),
+        "image_standard_compression": "標準 - 元の寸法を維持",
+        "image_maximum_compression": "強力 - 非常に大きい画像を縮小",
+        "image_massive_compression": "最大 - 画像ファイルを最小化",
+        "image_standard_quality": "元の寸法を保ち、軽い画質低下で効率よく圧縮します。",
+        "image_major_quality": "非常に大きい画像を 2560 px に制限し、強く圧縮します。",
+        "image_massive_quality": "画像を 1600 px に制限し、最も強く画質を下げます。",
+        "image_drop_files": "ここに画像ファイルをドロップ\n\nまたはクリックして参照",
+        "image_choose_files": "ここをクリックして画像ファイルを選択",
+        "processing_images": "{count} 個の画像ファイルを処理中...",
+        "image_browse_files": "画像ファイルを参照",
+        "image_select_title": "SmashPDF で圧縮する画像を選択",
+        "image_files": "画像ファイル",
+        "skipped_not_image": "スキップ（未対応の画像）：{name}",
+        "no_image": "対応する画像ファイルが見つかりません。",
+        "finished_images": "完了しました。{successes} 個の圧縮画像を作成しました。",
+        "image_result_summary": (
+            "作成先：{output}\nフレーム数：{frames}；{profile}\n"
+            "サイズ：{source_mb:.2f} MB -> {output_mb:.2f} MB（{size_change}）"
+        ),
+    },
+    "ko": {
+        "image_action": "이미지 압축",
+        "image_intro": (
+            "이미지를 아래에 놓아 더 작은 사본을 만드세요. "
+            "원본은 변경되지 않으며 결과는 "
+            "같은 폴더에 저장됩니다."
+        ),
+        "image_warning": (
+            "JPEG, PNG, WebP, GIF, BMP 및 TIFF를 지원합니다. 강한 설정은 크기나 화질을 "
+            "낮출 수 있습니다. 애니메이션 프레임은 유지됩니다."
+        ),
+        "image_standard_compression": "표준 - 원본 크기 유지",
+        "image_maximum_compression": "강력 - 매우 큰 이미지 축소 가능",
+        "image_massive_compression": "최대 - 가장 작은 이미지 파일",
+        "image_standard_quality": (
+            "원본 크기를 유지하고 약간의 화질 저하로 효율적으로 압축합니다."
+        ),
+        "image_major_quality": (
+            "매우 큰 이미지를 2560 px로 제한하고 더 강하게 압축합니다."
+        ),
+        "image_massive_quality": (
+            "이미지를 1600 px로 제한하고 화질을 가장 많이 낮춥니다."
+        ),
+        "image_drop_files": "이미지 파일을 여기에 놓으세요\n\n또는 클릭하여 찾아보기",
+        "image_choose_files": "여기를 클릭하여 이미지 파일 선택",
+        "processing_images": "이미지 파일 {count}개 처리 중...",
+        "image_browse_files": "이미지 파일 찾아보기",
+        "image_select_title": "SmashPDF로 압축할 이미지 선택",
+        "image_files": "이미지 파일",
+        "skipped_not_image": "건너뜀(지원하지 않는 이미지): {name}",
+        "no_image": "지원되는 이미지 파일을 찾을 수 없습니다.",
+        "finished_images": "완료되었습니다. 압축 이미지 {successes}개를 만들었습니다.",
+        "image_result_summary": (
+            "생성됨: {output}\n프레임: {frames}; {profile}\n"
+            "크기: {source_mb:.2f} MB -> {output_mb:.2f} MB ({size_change})"
+        ),
+    },
+}
+for _language, _image_translations in IMAGE_TRANSLATIONS.items():
+    TRANSLATIONS[_language].update(_image_translations)
+
 COMPRESSION_PROFILES = {
     "none": {
         "label": "Unlock only",
@@ -558,6 +775,33 @@ COMPRESSION_PROFILES = {
         "suffix": "_unlocked_massive_compressed",
     },
 }
+IMAGE_COMPRESSION_PROFILES = {
+    "standard": {
+        "label": "Standard image compression",
+        "max_dimension": None,
+        "quality": 85,
+        "png_colors": None,
+        "gif_colors": 256,
+    },
+    "major": {
+        "label": "Strong image compression",
+        "max_dimension": 2560,
+        "quality": 68,
+        "png_colors": 256,
+        "gif_colors": 192,
+    },
+    "massive": {
+        "label": "Maximum image compression",
+        "max_dimension": 1600,
+        "quality": 45,
+        "png_colors": 128,
+        "gif_colors": 96,
+    },
+}
+SUPPORTED_IMAGE_EXTENSIONS = frozenset(
+    {".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+)
+MAX_TOTAL_IMAGE_PIXELS = 250_000_000
 
 
 class PasswordRequiredError(Exception):
@@ -592,6 +836,22 @@ class LockResult:
     was_encrypted: bool
     source_size: int
     output_size: int
+
+
+@dataclass(frozen=True)
+class ImageCompressionResult:
+    source: Path
+    output: Path
+    frame_count: int
+    compression_mode: str
+    source_size: int
+    output_size: int
+
+    @property
+    def reduction_percent(self) -> float:
+        if not self.source_size:
+            return 0.0
+        return (1 - self.output_size / self.source_size) * 100
 
 
 LOCKED_PERMISSIONS = (
@@ -630,7 +890,10 @@ USER_ACTION_PERMISSIONS = (
 )
 
 
-def _format_size_change(result: UnlockResult, language: str = "en") -> str:
+def _format_size_change(
+    result: UnlockResult | ImageCompressionResult,
+    language: str = "en",
+) -> str:
     translations = TRANSLATIONS[language]
     if result.reduction_percent > 0:
         return translations["size_smaller"].format(percent=result.reduction_percent)
@@ -919,6 +1182,271 @@ def default_lock_output_path(source: Path) -> Path:
         if not candidate.exists():
             return candidate
         number += 1
+
+
+def default_image_output_path(source: Path) -> Path:
+    suffix = "_compressed"
+    base = source.with_name(f"{source.stem}{suffix}{source.suffix}")
+    if not base.exists():
+        return base
+
+    number = 2
+    while True:
+        candidate = source.with_name(f"{source.stem}{suffix} ({number}){source.suffix}")
+        if not candidate.exists():
+            return candidate
+        number += 1
+
+
+def _preserved_image_metadata(image, image_format: str) -> dict:
+    metadata = {}
+    for key in ("exif", "icc_profile", "dpi"):
+        value = image.info.get(key)
+        if value:
+            metadata[key] = value
+
+    if image_format == "PNG" and getattr(image, "text", None):
+        from PIL.PngImagePlugin import PngInfo
+
+        png_info = PngInfo()
+        for key, value in image.text.items():
+            if isinstance(value, str):
+                png_info.add_text(str(key), value)
+        metadata["pnginfo"] = png_info
+    return metadata
+
+
+def _resize_image_frame(frame, max_dimension: int | None):
+    candidate = frame.copy()
+    candidate.load()
+    if max_dimension and max(candidate.size) > max_dimension:
+        from PIL import Image
+
+        candidate.thumbnail(
+            (max_dimension, max_dimension),
+            Image.Resampling.LANCZOS,
+        )
+    return candidate
+
+
+def _prepare_image_frame(frame, image_format: str, profile: dict):
+    from PIL import Image
+
+    candidate = _resize_image_frame(frame, profile["max_dimension"])
+    has_alpha = candidate.mode in {"RGBA", "LA"} or (
+        candidate.mode == "P" and "transparency" in candidate.info
+    )
+    if image_format == "JPEG":
+        if has_alpha:
+            rgba = candidate.convert("RGBA")
+            background = Image.new("RGB", rgba.size, "white")
+            background.paste(rgba, mask=rgba.getchannel("A"))
+            candidate = background
+        elif candidate.mode not in {"RGB", "L", "CMYK"}:
+            candidate = candidate.convert("RGB")
+    elif image_format == "PNG" and profile["png_colors"]:
+        if candidate.mode not in {"RGB", "RGBA"}:
+            candidate = candidate.convert("RGBA" if has_alpha else "RGB")
+        method = (
+            Image.Quantize.FASTOCTREE
+            if candidate.mode == "RGBA"
+            else Image.Quantize.MEDIANCUT
+        )
+        candidate = candidate.quantize(
+            colors=profile["png_colors"],
+            method=method,
+        )
+    elif image_format in {"GIF", "BMP"}:
+        colors = profile["gif_colors"]
+        if candidate.mode not in {"RGB", "RGBA"}:
+            candidate = candidate.convert("RGBA" if has_alpha else "RGB")
+        method = (
+            Image.Quantize.FASTOCTREE
+            if candidate.mode == "RGBA"
+            else Image.Quantize.MEDIANCUT
+        )
+        candidate = candidate.quantize(colors=colors, method=method)
+    elif image_format == "WEBP" and candidate.mode not in {"RGB", "RGBA"}:
+        candidate = candidate.convert("RGBA" if "A" in candidate.mode else "RGB")
+    return candidate
+
+
+def _image_save_options(image, image_format: str, profile: dict) -> dict:
+    options = _preserved_image_metadata(image, image_format)
+    quality = profile["quality"]
+    if image_format == "JPEG":
+        options.update(
+            quality=quality,
+            optimize=True,
+            progressive=True,
+            subsampling=0 if quality >= 80 else 2,
+        )
+    elif image_format == "PNG":
+        options.update(optimize=True, compress_level=9)
+    elif image_format == "WEBP":
+        options.update(quality=quality, method=6)
+    elif image_format == "GIF":
+        options.update(optimize=True)
+    elif image_format == "TIFF":
+        options.update(compression="tiff_adobe_deflate")
+    return options
+
+
+def _write_compressed_image(source_image, temp_path: Path, mode: str) -> int:
+    from PIL import Image, ImageSequence
+
+    image_format = str(source_image.format or "").upper()
+    if image_format == "JPG":
+        image_format = "JPEG"
+    if image_format not in {"JPEG", "PNG", "WEBP", "GIF", "BMP", "TIFF"}:
+        raise ValueError(f"Unsupported image format: {image_format or 'unknown'}")
+
+    profile = IMAGE_COMPRESSION_PROFILES[mode]
+    frame_count = int(getattr(source_image, "n_frames", 1))
+    total_pixels = source_image.width * source_image.height * frame_count
+    if total_pixels > MAX_TOTAL_IMAGE_PIXELS:
+        raise Image.DecompressionBombError(
+            "The picture or animation is too large to process safely."
+        )
+    frames = [
+        _prepare_image_frame(frame, image_format, profile)
+        for frame in ImageSequence.Iterator(source_image)
+    ]
+    if not frames:
+        raise ValueError("The image contains no readable frames.")
+
+    options = _image_save_options(source_image, image_format, profile)
+    if len(frames) > 1:
+        options["save_all"] = True
+        options["append_images"] = frames[1:]
+        durations = [
+            int(frame.info.get("duration", source_image.info.get("duration", 0)))
+            for frame in ImageSequence.Iterator(source_image)
+        ]
+        if any(durations):
+            options["duration"] = durations
+        if "loop" in source_image.info:
+            options["loop"] = source_image.info["loop"]
+
+    frames[0].save(temp_path, format=image_format, **options)
+    return frame_count
+
+
+def _validate_compressed_image(
+    output: Path,
+    *,
+    expected_format: str,
+    expected_frames: int,
+    source_size: int,
+) -> None:
+    from PIL import Image
+
+    output_size = output.stat().st_size
+    if output_size >= source_size:
+        raise RuntimeError(
+            "The image is already optimised; this setting could not make it smaller."
+        )
+    with Image.open(output) as check:
+        check.verify()
+    with Image.open(output) as check:
+        actual_format = str(check.format or "").upper()
+        if actual_format != expected_format:
+            raise RuntimeError(
+                f"Image format changed from {expected_format} to {actual_format}."
+            )
+        actual_frames = int(getattr(check, "n_frames", 1))
+        if actual_frames != expected_frames:
+            raise RuntimeError(
+                f"Frame count changed from {expected_frames} to {actual_frames}."
+            )
+        if check.width <= 0 or check.height <= 0:
+            raise RuntimeError("The compressed image has invalid dimensions.")
+
+
+def compress_image(
+    source: str | Path,
+    *,
+    output: str | Path | None = None,
+    overwrite: bool = False,
+    compression: str = "standard",
+) -> ImageCompressionResult:
+    """Create a smaller image copy beside the source while preserving its format."""
+
+    from PIL import Image
+
+    if compression not in IMAGE_COMPRESSION_PROFILES:
+        raise ValueError(f"Unknown image compression mode: {compression}")
+
+    source_path = Path(source).expanduser().resolve()
+    if not source_path.is_file():
+        raise FileNotFoundError(f"Image not found: {source_path}")
+    if source_path.suffix.lower() not in SUPPORTED_IMAGE_EXTENSIONS:
+        raise ValueError(f"Unsupported image file: {source_path}")
+
+    automatic_output = output is None
+    output_path = (
+        Path(output).expanduser().resolve()
+        if output is not None
+        else default_image_output_path(source_path)
+    )
+    if output_path == source_path:
+        raise ValueError("The output must be different from the source image.")
+    if output_path.suffix.lower() != source_path.suffix.lower():
+        raise ValueError("The output must use the same image file extension.")
+    if output_path.exists() and not overwrite:
+        raise FileExistsError(f"Output already exists: {output_path}")
+
+    source_size = source_path.stat().st_size
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_fd, temp_name = tempfile.mkstemp(
+        prefix=f".{output_path.stem}-",
+        suffix=output_path.suffix,
+        dir=str(output_path.parent),
+    )
+    os.close(temp_fd)
+    temp_path = Path(temp_name)
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(source_path) as source_image:
+                expected_format = str(source_image.format or "").upper()
+                if expected_format == "JPG":
+                    expected_format = "JPEG"
+                frame_count = _write_compressed_image(
+                    source_image,
+                    temp_path,
+                    compression,
+                )
+        _validate_compressed_image(
+            temp_path,
+            expected_format=expected_format,
+            expected_frames=frame_count,
+            source_size=source_size,
+        )
+        if overwrite:
+            os.replace(temp_path, output_path)
+        else:
+            while True:
+                try:
+                    _publish_without_overwrite(temp_path, output_path)
+                    break
+                except FileExistsError:
+                    if not automatic_output:
+                        raise
+                    output_path = default_image_output_path(source_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+    return ImageCompressionResult(
+        source=source_path,
+        output=output_path,
+        frame_count=frame_count,
+        compression_mode=compression,
+        source_size=source_size,
+        output_size=output_path.stat().st_size,
+    )
 
 
 def _publish_without_overwrite(temp_path: Path, output_path: Path) -> None:
@@ -1310,6 +1838,17 @@ def _format_lock_result(result: LockResult) -> str:
     )
 
 
+def _format_image_result(result: ImageCompressionResult) -> str:
+    return (
+        f"Created: {result.output}\n"
+        f"Frames: {result.frame_count}; "
+        f"{IMAGE_COMPRESSION_PROFILES[result.compression_mode]['label'].lower()}\n"
+        f"Size: {result.source_size / 1_048_576:.2f} MB -> "
+        f"{result.output_size / 1_048_576:.2f} MB "
+        f"({_format_size_change(result)})"
+    )
+
+
 def _increase_named_font_sizes(root, increase: int = 2) -> None:
     """Increase every Tk named font and apply a bold, high-visibility weight."""
     from tkinter import font as tkfont
@@ -1345,8 +1884,8 @@ def run_gui() -> int:
         drag_and_drop_available = False
 
     root.title(APP_NAME)
-    root.geometry("840x780")
-    root.minsize(780, 700)
+    root.geometry("840x820")
+    root.minsize(780, 740)
 
     app_logo = None
     try:
@@ -1439,7 +1978,15 @@ def run_gui() -> int:
         value="lock",
         command=lambda: update_compression_controls(),
     )
-    lock_radio.pack(anchor="w", padx=(22, 0), pady=(2, 8))
+    lock_radio.pack(anchor="w", padx=(22, 0), pady=2)
+    image_radio = ttk.Radiobutton(
+        options,
+        text=tr("image_action"),
+        variable=action_mode,
+        value="image",
+        command=lambda: update_compression_controls(),
+    )
+    image_radio.pack(anchor="w", padx=(22, 0), pady=(2, 8))
 
     compression_check = ttk.Checkbutton(
         options,
@@ -1482,26 +2029,79 @@ def run_gui() -> int:
     )
     quality_label.pack(anchor="w", pady=(5, 0))
 
+    dynamic_widgets = {}
+
     def update_compression_controls() -> None:
-        unlocking = action_mode.get() == "unlock"
-        compression_check.configure(state="normal" if unlocking else "disabled")
-        state = "normal" if unlocking and compression_enabled.get() else "disabled"
+        selected_action = action_mode.get()
+        unlocking = selected_action == "unlock"
+        compressing_images = selected_action == "image"
+        if compressing_images:
+            compression_check.pack_forget()
+        else:
+            if not compression_check.winfo_manager():
+                compression_check.pack(
+                    anchor="w",
+                    pady=(2, 5),
+                    before=standard_radio,
+                )
+            compression_check.configure(state="normal" if unlocking else "disabled")
+
+        state = (
+            "normal"
+            if compressing_images or (unlocking and compression_enabled.get())
+            else "disabled"
+        )
         standard_radio.configure(state=state)
         major_radio.configure(state=state)
         massive_radio.configure(state=state)
-        warning_key = (
-            "massive_quality_warning"
-            if compression_enabled.get() and compression_level.get() == "massive"
-            else "no_quality_removed"
-        )
+        if compressing_images:
+            standard_radio.configure(text=tr("image_standard_compression"))
+            major_radio.configure(text=tr("image_maximum_compression"))
+            massive_radio.configure(text=tr("image_massive_compression"))
+            warning_key = {
+                "standard": "image_standard_quality",
+                "major": "image_major_quality",
+                "massive": "image_massive_quality",
+            }[compression_level.get()]
+        else:
+            standard_radio.configure(text=tr("standard_compression"))
+            major_radio.configure(text=tr("maximum_compression"))
+            massive_radio.configure(text=tr("massive_compression"))
+            warning_key = (
+                "massive_quality_warning"
+                if compression_enabled.get() and compression_level.get() == "massive"
+                else "no_quality_removed"
+            )
         quality_label.configure(text=tr(warning_key))
-        intro_label.configure(text=tr("intro" if unlocking else "lock_intro"))
-        warning_label.configure(text=tr("warning" if unlocking else "lock_warning"))
+        intro_key = {
+            "unlock": "intro",
+            "lock": "lock_intro",
+            "image": "image_intro",
+        }[selected_action]
+        warning_text_key = {
+            "unlock": "warning",
+            "lock": "lock_warning",
+            "image": "image_warning",
+        }[selected_action]
+        intro_label.configure(text=tr(intro_key))
+        warning_label.configure(text=tr(warning_text_key))
+        if "drop_zone" in dynamic_widgets:
+            dynamic_widgets["drop_zone"].configure(text=current_drop_text())
+            dynamic_widgets["choose_button"].configure(text=current_browse_text())
 
     update_compression_controls()
 
     def current_drop_text() -> str:
+        if action_mode.get() == "image":
+            return tr(
+                "image_drop_files" if drag_and_drop_available else "image_choose_files"
+            )
         return tr("drop_files") if drag_and_drop_available else tr("choose_files")
+
+    def current_browse_text() -> str:
+        return tr(
+            "image_browse_files" if action_mode.get() == "image" else "browse_files"
+        )
 
     drop_zone = tk.Label(
         outer,
@@ -1515,6 +2115,7 @@ def run_gui() -> int:
         cursor="hand2",
     )
     drop_zone.pack(fill="x", pady=(0, 14))
+    dynamic_widgets["drop_zone"] = drop_zone
 
     log = tk.Text(
         outer,
@@ -1575,27 +2176,54 @@ def run_gui() -> int:
             output_mb=result.output_size / 1_048_576,
         )
 
+    def format_gui_image_result(result: ImageCompressionResult) -> str:
+        profile_key = {
+            "standard": "image_standard_compression",
+            "major": "image_maximum_compression",
+            "massive": "image_massive_compression",
+        }[result.compression_mode]
+        return tr(
+            "image_result_summary",
+            output=result.output,
+            frames=result.frame_count,
+            profile=tr(profile_key),
+            source_mb=result.source_size / 1_048_576,
+            output_mb=result.output_size / 1_048_576,
+            size_change=_format_size_change(result, language_code.get()),
+        )
+
     def process_files(filenames) -> None:
-        pdf_files = []
+        selected_action = action_mode.get()
+        input_files = []
         for filename in filenames:
             path = Path(filename)
-            if path.is_file() and path.suffix.lower() == ".pdf":
-                pdf_files.append(path)
+            valid_file = path.is_file() and (
+                path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS
+                if selected_action == "image"
+                else path.suffix.lower() == ".pdf"
+            )
+            if valid_file:
+                input_files.append(path)
             else:
-                append_log(tr("skipped_not_pdf", name=path.name or path))
+                skipped_key = (
+                    "skipped_not_image"
+                    if selected_action == "image"
+                    else "skipped_not_pdf"
+                )
+                append_log(tr(skipped_key, name=path.name or path))
 
-        if not pdf_files:
+        if not input_files:
             messagebox.showwarning(
                 APP_NAME,
-                tr("no_pdf"),
+                tr("no_image" if selected_action == "image" else "no_pdf"),
                 parent=root,
             )
             return
 
-        selected_action = action_mode.get()
         selected_mode = (
             compression_level.get()
-            if selected_action == "unlock" and compression_enabled.get()
+            if selected_action == "image"
+            or (selected_action == "unlock" and compression_enabled.get())
             else "none"
         )
         new_password = None
@@ -1632,7 +2260,12 @@ def run_gui() -> int:
                 return
         choose_button.configure(state="disabled")
         drop_zone.configure(
-            text=tr("processing_files", count=len(pdf_files)),
+            text=tr(
+                "processing_images"
+                if selected_action == "image"
+                else "processing_files",
+                count=len(input_files),
+            ),
             cursor="watch",
             background="#FFF7E6",
         )
@@ -1640,10 +2273,12 @@ def run_gui() -> int:
         failures = []
 
         try:
-            for source in pdf_files:
+            for source in input_files:
                 append_log(tr("processing_file", name=source.name))
                 try:
-                    if selected_action == "lock":
+                    if selected_action == "image":
+                        result = compress_image(source, compression=selected_mode)
+                    elif selected_action == "lock":
                         result = lock_pdf(source, new_password or "")
                     else:
                         result = unlock_pdf(source, compression=selected_mode)
@@ -1681,7 +2316,9 @@ def run_gui() -> int:
                     continue
 
                 successes += 1
-                if isinstance(result, LockResult):
+                if isinstance(result, ImageCompressionResult):
+                    append_log(format_gui_image_result(result))
+                elif isinstance(result, LockResult):
                     append_log(format_gui_lock_result(result))
                 else:
                     append_log(format_gui_result(result))
@@ -1707,16 +2344,28 @@ def run_gui() -> int:
         else:
             messagebox.showinfo(
                 APP_NAME,
-                tr("finished", successes=successes),
+                tr(
+                    "finished_images" if selected_action == "image" else "finished",
+                    successes=successes,
+                ),
                 parent=root,
             )
 
     def select_and_unlock() -> None:
+        selecting_images = action_mode.get() == "image"
         filenames = filedialog.askopenfilenames(
             parent=root,
-            title=tr("select_title"),
+            title=tr("image_select_title" if selecting_images else "select_title"),
             filetypes=[
-                (tr("pdf_files"), "*.pdf"),
+                (
+                    tr("image_files" if selecting_images else "pdf_files"),
+                    (
+                        "*.jpg *.jpeg *.jpe *.jfif *.png *.webp *.gif *.bmp "
+                        "*.tif *.tiff"
+                        if selecting_images
+                        else "*.pdf"
+                    ),
+                ),
                 (tr("all_files"), "*.*"),
             ],
         )
@@ -1778,10 +2427,11 @@ def run_gui() -> int:
 
     choose_button = ttk.Button(
         button_row,
-        text=tr("browse_files"),
+        text=current_browse_text(),
         command=select_and_unlock,
     )
     choose_button.pack(side="left")
+    dynamic_widgets["choose_button"] = choose_button
     close_button = ttk.Button(
         button_row,
         text=tr("close"),
@@ -1812,13 +2462,11 @@ def run_gui() -> int:
         action_label.configure(text=tr("action"))
         unlock_radio.configure(text=tr("unlock_action"))
         lock_radio.configure(text=tr("lock_action"))
+        image_radio.configure(text=tr("image_action"))
         compression_check.configure(text=tr("compress_after_unlocking"))
-        standard_radio.configure(text=tr("standard_compression"))
-        major_radio.configure(text=tr("maximum_compression"))
-        massive_radio.configure(text=tr("massive_compression"))
         update_compression_controls()
         drop_zone.configure(text=current_drop_text())
-        choose_button.configure(text=tr("browse_files"))
+        choose_button.configure(text=current_browse_text())
         about_button.configure(text=tr("about"))
         close_button.configure(text=tr("close"))
         try:
@@ -1842,11 +2490,10 @@ def run_gui() -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Create unrestricted or AES-256 locked PDF copies without modifying "
-            "the source files."
+            "Unlock, protect, or compress local files without modifying the sources."
         )
     )
-    parser.add_argument("files", nargs="*", help="PDF files to unlock")
+    parser.add_argument("files", nargs="*", help="PDF or picture files to process")
     parser.add_argument(
         "-p",
         "--password",
@@ -1874,12 +2521,17 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--compress-images",
+        action="store_true",
+        help="Compress JPEG, PNG, WebP, GIF, BMP, or TIFF picture files",
+    )
+    parser.add_argument(
         "--compression",
         choices=("none", "standard", "major", "massive"),
         default="none",
         help=(
-            "Compression mode: none, standard or major (lossless), or massive "
-            "(lossy image compression)"
+            "Compression mode. For PDFs: none, standard or major (lossless), "
+            "or massive (lossy). For pictures: standard, major, or massive."
         ),
     )
     parser.add_argument(
@@ -1895,11 +2547,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.gui or not args.files:
         return run_gui()
     if args.output and len(args.files) != 1:
-        raise SystemExit("--output can only be used with one input PDF.")
+        raise SystemExit("--output can only be used with one input file.")
     if args.lock_password and not args.lock:
         raise SystemExit("--lock-password requires --lock.")
+    if args.lock and args.compress_images:
+        raise SystemExit("--lock cannot be used with --compress-images.")
     if args.lock and args.compression != "none":
         raise SystemExit("--compression cannot be used with --lock.")
+    if args.password and args.compress_images:
+        raise SystemExit("--password cannot be used with --compress-images.")
 
     lock_password = args.lock_password
     if args.lock and lock_password is None:
@@ -1913,7 +2569,18 @@ def main(argv: list[str] | None = None) -> int:
     exit_code = 0
     for filename in args.files:
         try:
-            if args.lock:
+            if args.compress_images:
+                image_compression = (
+                    "standard" if args.compression == "none" else args.compression
+                )
+                result = compress_image(
+                    filename,
+                    output=args.output,
+                    overwrite=args.overwrite,
+                    compression=image_compression,
+                )
+                print(_format_image_result(result))
+            elif args.lock:
                 result = lock_pdf(
                     filename,
                     lock_password or "",
