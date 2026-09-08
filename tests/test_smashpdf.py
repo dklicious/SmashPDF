@@ -32,9 +32,11 @@ from smashpdf import (
     ImageCompressionResult,
     LockResult,
     PasswordRequiredError,
+    PdfSearchResult,
     UnlockResult,
     _format_result,
     _format_size_change,
+    collect_pdf_files,
     compress_image,
     default_image_output_path,
     default_lock_output_path,
@@ -42,6 +44,7 @@ from smashpdf import (
     load_language_preference,
     lock_pdf,
     save_language_preference,
+    search_pdf,
     unlock_pdf,
 )
 
@@ -54,6 +57,111 @@ def _blank_pdf(path: Path) -> None:
     writer = PdfWriter()
     writer.add_blank_page(width=612, height=792)
     writer.write(path)
+
+
+def _text_pdf(path: Path, page_texts: list[str]) -> None:
+    writer = PdfWriter()
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_reference = writer._add_object(font)
+    for text in page_texts:
+        page = writer.add_blank_page(width=612, height=792)
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_reference})}
+        )
+        content = DecodedStreamObject()
+        escaped = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        content.set_data(f"BT /F1 12 Tf ({escaped}) Tj ET".encode("latin-1"))
+        page[NameObject("/Contents")] = writer._add_object(content)
+    writer.write(path)
+
+
+def test_search_pdf_finds_names_with_pages_and_context(tmp_path: Path) -> None:
+    source = tmp_path / "lease.pdf"
+    _text_pdf(
+        source,
+        [
+            "Lease for Jane Citizen at 3 Glasshouse Way.",
+            "Bond for JANE CITIZEN. Contact Jane Citizen today.",
+        ],
+    )
+
+    result = search_pdf(source, "jane citizen")
+
+    assert isinstance(result, PdfSearchResult)
+    assert result.source == source.resolve()
+    assert result.page_count == 2
+    assert result.searchable_pages == 2
+    assert [match.page_number for match in result.matches] == [1, 2, 2]
+    assert all("Citizen" in match.snippet for match in result.matches)
+    assert result.truncated is False
+
+    exact = search_pdf(source, "Jane Citizen", case_sensitive=True)
+    assert [match.page_number for match in exact.matches] == [1, 2]
+
+
+def test_search_pdf_reports_image_only_pages_and_match_limit(tmp_path: Path) -> None:
+    blank = tmp_path / "scan.pdf"
+    _blank_pdf(blank)
+    blank_result = search_pdf(blank, "tenant")
+    assert blank_result.searchable_pages == 0
+    assert not blank_result.matches
+
+    repeated = tmp_path / "repeated.pdf"
+    _text_pdf(repeated, ["tenant tenant tenant"])
+    limited = search_pdf(repeated, "tenant", max_matches=2, context_chars=0)
+    assert len(limited.matches) == 2
+    assert limited.truncated is True
+
+
+def test_collect_pdf_files_expands_folders_and_removes_duplicates(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "first.PDF"
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    second = nested / "second.pdf"
+    _blank_pdf(first)
+    _blank_pdf(second)
+    (nested / "notes.txt").write_text("ignored", encoding="utf-8")
+
+    assert collect_pdf_files([tmp_path, first]) == [first.resolve(), second.resolve()]
+
+    unsupported = tmp_path / "notes.txt"
+    assert collect_pdf_files([unsupported, tmp_path / "missing.pdf"]) == []
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"context_chars": -1}, "cannot be negative"),
+        ({"max_matches": 0}, "at least 1"),
+    ],
+)
+def test_search_pdf_validates_options(
+    tmp_path: Path,
+    kwargs: dict[str, int],
+    message: str,
+) -> None:
+    source = tmp_path / "source.pdf"
+    _blank_pdf(source)
+    with pytest.raises(ValueError, match=message):
+        search_pdf(source, "tenant", **kwargs)
+
+
+def test_search_pdf_rejects_empty_text(tmp_path: Path) -> None:
+    source = tmp_path / "source.pdf"
+    _blank_pdf(source)
+    with pytest.raises(ValueError, match="cannot be empty"):
+        search_pdf(source, "  \n ")
+
+    with pytest.raises(ValueError, match="Not a PDF"):
+        search_pdf(tmp_path / "missing.pdf", "tenant")
 
 
 def test_app_uses_canonical_version() -> None:
@@ -486,6 +594,17 @@ def _encrypted_pdf(
         algorithm="AES-256",
     )
     writer.write(path)
+
+
+def test_search_pdf_prompts_for_encrypted_document_password(tmp_path: Path) -> None:
+    source = tmp_path / "protected.pdf"
+    _encrypted_pdf(source, user_password="correct-password")
+
+    with pytest.raises(PasswordRequiredError):
+        search_pdf(source, "tenant")
+
+    result = search_pdf(source, "tenant", password="correct-password")
+    assert result.page_count == 1
 
 
 def test_removes_permission_encryption_without_touching_source(tmp_path: Path) -> None:

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 from pypdf import PasswordType, PdfReader, PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from smashpdf import build_parser, main
 
@@ -12,6 +13,26 @@ from smashpdf import build_parser, main
 def _blank_pdf(path: Path) -> None:
     writer = PdfWriter()
     writer.add_blank_page(width=612, height=792)
+    writer.write(path)
+
+
+def _text_pdf(path: Path, text: str) -> None:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_reference = writer._add_object(font)
+    page[NameObject("/Resources")] = DictionaryObject(
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_reference})}
+    )
+    content = DecodedStreamObject()
+    content.set_data(f"BT /F1 12 Tf ({text}) Tj ET".encode("ascii"))
+    page[NameObject("/Contents")] = writer._add_object(content)
     writer.write(path)
 
 
@@ -78,6 +99,34 @@ def test_cli_compresses_picture_in_same_folder(
     assert f"Created: {output}" in captured.out
     assert output.stat().st_size < source.stat().st_size
     assert not captured.err
+
+
+def test_cli_searches_a_folder_recursively_and_reports_context(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    nested = tmp_path / "leases"
+    nested.mkdir()
+    matching = nested / "tenant.pdf"
+    other = nested / "other.pdf"
+    _text_pdf(matching, "Lease record for Example Tenant in Truganina")
+    _text_pdf(other, "No relevant person in this file")
+
+    exit_code = main([str(tmp_path), "--search", "example tenant"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert f"{matching.resolve()} — page 1" in captured.out
+    assert "Lease record for Example Tenant" in captured.out
+    assert f"{other.resolve()}: 0 match(es)" in captured.out
+    assert not captured.err
+
+
+def test_cli_search_requires_compatible_options() -> None:
+    with pytest.raises(SystemExit, match="requires --search"):
+        main(["document.pdf", "--case-sensitive"])
+    with pytest.raises(SystemExit, match="cannot be used"):
+        main(["document.pdf", "--search", "tenant", "--output", "result.pdf"])
 
 
 def test_cli_rejects_lock_password_without_lock() -> None:

@@ -10,6 +10,8 @@ from unittest.mock import Mock
 
 import pytest
 from PIL import Image
+from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 import smashpdf
 
@@ -33,6 +35,26 @@ def _font_weight(root, widget) -> str:
     return str(tkfont.Font(root=root, font=widget.cget("font")).actual("weight"))
 
 
+def _text_pdf(path: Path, text: str) -> None:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_reference = writer._add_object(font)
+    page[NameObject("/Resources")] = DictionaryObject(
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_reference})}
+    )
+    content = DecodedStreamObject()
+    content.set_data(f"BT /F1 12 Tf ({text}) Tj ET".encode("ascii"))
+    page[NameObject("/Contents")] = writer._add_object(content)
+    writer.write(path)
+
+
 def test_gui_constructs_processes_and_switches_language(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -43,12 +65,17 @@ def test_gui_constructs_processes_and_switches_language(
         "JPEG",
         quality=95,
     )
+    search_source = tmp_path / "gui-search.pdf"
+    _text_pdf(search_source, "Lease record for Example Tenant in Truganina")
     settings = tmp_path / "settings.json"
 
     real_tk = tk.Tk
     show_info = Mock()
     show_warning = Mock()
     open_project = Mock(return_value=True)
+    select_files = Mock(
+        side_effect=((str(source),), (str(search_source),)),
+    )
     default_font_size = None
 
     def hidden_tk():
@@ -100,7 +127,10 @@ def test_gui_constructs_processes_and_switches_language(
         image_option.invoke()
         root.update_idletasks()
         compression_toggle = next(
-            widget for widget in widgets if isinstance(widget, ttk.Checkbutton)
+            widget
+            for widget in widgets
+            if isinstance(widget, ttk.Checkbutton)
+            and widget.cget("text") == "解锁后压缩 PDF"
         )
         assert not compression_toggle.winfo_manager()
         browse = next(
@@ -109,6 +139,36 @@ def test_gui_constructs_processes_and_switches_language(
             if isinstance(widget, ttk.Button) and "图片" in widget.cget("text")
         )
         browse.invoke()
+
+        search_option = next(
+            widget
+            for widget in widgets
+            if isinstance(widget, ttk.Radiobutton) and widget.cget("text") == "搜索 PDF"
+        )
+        search_option.invoke()
+        root.update_idletasks()
+        search_entry = next(
+            widget
+            for widget in _descendants(root)
+            if isinstance(widget, ttk.Entry) and not isinstance(widget, ttk.Combobox)
+        )
+        search_entry.insert(0, "example tenant")
+        search_browse = next(
+            widget
+            for widget in _descendants(root)
+            if isinstance(widget, ttk.Button) and widget.cget("text") == "选择 PDF 文件"
+        )
+        assert str(search_browse.cget("state")) == "normal"
+        search_browse.invoke()
+        root.update_idletasks()
+        assert select_files.call_count == 2
+        assert "gui-search.pdf — 第 1 页" in log.get("1.0", "end")
+        folder_browse = next(
+            widget
+            for widget in _descendants(root)
+            if isinstance(widget, ttk.Button) and widget.cget("text") == "选择文件夹"
+        )
+        assert folder_browse.winfo_manager()
 
         about = next(
             widget
@@ -149,7 +209,7 @@ def test_gui_constructs_processes_and_switches_language(
     monkeypatch.setattr(
         filedialog,
         "askopenfilenames",
-        lambda **_kwargs: (str(source),),
+        select_files,
     )
     monkeypatch.setattr(messagebox, "showinfo", show_info)
     monkeypatch.setattr(messagebox, "showwarning", show_warning)
@@ -161,6 +221,6 @@ def test_gui_constructs_processes_and_switches_language(
     assert output.stat().st_size < source.stat().st_size
     with Image.open(output) as compressed:
         assert compressed.format == "JPEG"
-    show_info.assert_called_once()
+    assert show_info.call_count == 2
     show_warning.assert_not_called()
     open_project.assert_called_once_with(smashpdf.PROJECT_URL)

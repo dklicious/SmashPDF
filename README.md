@@ -4,9 +4,9 @@
   <img src="assets/smashpdf_logo.png" alt="SmashPDF official logo" width="180">
 </p>
 
-A local-first Windows tool that unlocks, compresses, or AES-256 encrypts PDF
-copies and compresses common picture formats without changing the source files.
-Documents, pictures, and passwords stay on your computer.
+A local-first Windows tool that searches, unlocks, compresses, or AES-256
+encrypts PDFs and compresses common picture formats without changing the source
+files. Documents, pictures, search terms, and passwords stay on your computer.
 
 ## Download and run
 
@@ -19,9 +19,9 @@ Each release also includes a SHA-256 checksum and CycloneDX software bill of
 materials (SBOM). Tagged release executables must pass Authenticode signing
 and GitHub build-provenance attestation before publication.
 
-Choose **Unlock PDF**, **Lock PDF**, or **Compress Images**, then drag files into
-the drop box. You can also click the box to browse. Each result is saved beside
-its source.
+Choose **Unlock PDF**, **Lock PDF**, **Compress Images**, or **Search PDFs**, then
+drag files into the drop box. You can also click the box to browse. Processed
+copies are saved beside their sources.
 Use the language selector to switch the interface instantly between English,
 Simplified Chinese, Traditional Chinese, Spanish, Japanese, and Korean.
 The first launch starts in English; later launches restore the last selected
@@ -29,6 +29,10 @@ language.
 
 Processing options:
 
+- **Search PDFs** finds a name, phrase, or other text across multiple PDFs. It
+  reports the file, page number, and nearby text. Choose a folder to search all
+  PDFs in it and its subfolders. Search is case-insensitive unless exact case is
+  selected, and it never changes the PDFs.
 - **Compress Images** accepts JPEG, PNG, WebP, animated GIF, BMP, and TIFF.
   Standard keeps the original dimensions, Strong limits very large pictures to
   2560 pixels, and Maximum limits them to 1600 pixels for the smallest output.
@@ -67,6 +71,7 @@ If that name already exists, the tool creates `Contract_unlocked (2).pdf`.
 - PDFs that require an opening password, when you provide that password.
 - Digital-signature and certification locks.
 - Multiple PDFs in one batch.
+- Searchable PDF text across selected files or an entire folder tree.
 - Existing non-signature form fields.
 - AES-256 password protection with restrictive PDF permissions.
 - JPEG, PNG, WebP, animated GIF, BMP, and TIFF image compression.
@@ -119,6 +124,8 @@ python smashpdf.py "C:\path\document.pdf" --lock
 python smashpdf.py "C:\path\photo.jpg" --compress-images --compression standard
 python smashpdf.py "C:\path\photo.png" --compress-images --compression major
 python smashpdf.py "C:\path\photo.tiff" --compress-images --compression massive
+python smashpdf.py "C:\path\PDF folder" --search "tenant name"
+python smashpdf.py "C:\path\document.pdf" --search "Exact Name" --case-sensitive
 ```
 
 When `--lock` is used, SmashPDF prompts for the new password without displaying
@@ -127,9 +134,14 @@ may be visible to other local processes and should be avoided on shared systems.
 
 Use `python smashpdf.py --help` for all options.
 
+PDF search reads selectable text. Image-only scans and photographed pages must
+be made searchable with OCR first; SmashPDF clearly reports files that contain
+no selectable text.
+
 ## Safety
 
 - Processing is local; files and passwords are not uploaded.
+- PDF searching is read-only and does not create or modify files.
 - The source file is never overwritten.
 - Output is written atomically and validated before delivery.
 - Concurrent SmashPDF instances cannot replace one another's new outputs.
