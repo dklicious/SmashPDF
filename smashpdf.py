@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create protected or compressed copies of local PDF and picture files.
+"""Search PDFs or create protected and compressed local file copies.
 
 The source file is never modified. Password encryption is removed after the
 document has been successfully opened. Digital-signature fields and document
@@ -8,6 +8,7 @@ as stamp annotations. Optional compression reduces embedded image resolution
 while preserving page geometry, images, and selectable text.
 Lock mode applies AES-256 encryption and restrictive PDF permission flags.
 Picture mode compresses common raster formats while preserving the source file.
+Search mode reads selectable PDF text and reports matching pages without writes.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import argparse
 import getpass
 import json
 import os
+import re
 import secrets
 import sys
 import tempfile
@@ -757,6 +759,204 @@ IMAGE_TRANSLATIONS = {
 for _language, _image_translations in IMAGE_TRANSLATIONS.items():
     TRANSLATIONS[_language].update(_image_translations)
 
+SEARCH_TRANSLATIONS = {
+    "en": {
+        "search_action": "Search PDFs",
+        "search_intro": (
+            "Search many PDFs at once without opening them. Drop PDF files or a "
+            "folder below to see every matching page and nearby text."
+        ),
+        "search_warning": (
+            "Search reads selectable text only. Scanned or photographed pages need "
+            "OCR before their words can be found. No files are changed."
+        ),
+        "search_for": "Text to find",
+        "case_sensitive": "Match uppercase and lowercase exactly",
+        "search_drop_files": (
+            "DROP PDF FILES OR A FOLDER HERE\n\nor click this box to browse files"
+        ),
+        "search_choose_files": "CLICK HERE TO CHOOSE PDF FILES",
+        "search_browse_files": "Choose PDF Files",
+        "search_browse_folder": "Choose Folder",
+        "search_folder_title": "Choose a folder to search recursively",
+        "search_query_required": "Enter the text you want to find first.",
+        "searching_files": "SEARCHING {count} PDF FILE(S)...",
+        "searching_file": "Searching: {name}",
+        "search_match": "{name} — page {page}\n{snippet}",
+        "search_file_summary": "{name}: {matches} match(es) on {pages} page(s).",
+        "search_no_match": "{name}: no matches.",
+        "search_no_text": (
+            "{name}: no selectable text found; it may be a scanned PDF."
+        ),
+        "search_truncated": (
+            "{name}: showing the first {limit} matches to keep results responsive."
+        ),
+        "search_finished": (
+            "Search finished. Found {matches} match(es) in {files} PDF file(s)."
+        ),
+    },
+    "zh": {
+        "search_action": "搜索 PDF",
+        "search_intro": (
+            "无需逐个打开即可搜索多个 PDF。将 PDF 文件或文件夹拖到下方，"
+            "查看匹配页码和附近文字。"
+        ),
+        "search_warning": "".join(
+            (
+                "只能搜索可选择的文字。扫描或拍照页面需要先进行 OCR。",
+                "不会更改任何文件。",
+            )
+        ),
+        "search_for": "要查找的文字",
+        "case_sensitive": "严格区分大小写",
+        "search_drop_files": "将 PDF 文件或文件夹拖放到这里\n\n或单击此框浏览文件",
+        "search_choose_files": "单击此处选择 PDF 文件",
+        "search_browse_files": "选择 PDF 文件",
+        "search_browse_folder": "选择文件夹",
+        "search_folder_title": "选择要递归搜索的文件夹",
+        "search_query_required": "请先输入要查找的文字。",
+        "searching_files": "正在搜索 {count} 个 PDF 文件...",
+        "searching_file": "正在搜索：{name}",
+        "search_match": "{name} — 第 {page} 页\n{snippet}",
+        "search_file_summary": "{name}：在 {pages} 页中找到 {matches} 个匹配项。",
+        "search_no_match": "{name}：未找到匹配项。",
+        "search_no_text": "{name}：未找到可选择的文字；这可能是扫描版 PDF。",
+        "search_truncated": "{name}：为保持响应速度，仅显示前 {limit} 个匹配项。",
+        "search_finished": (
+            "搜索完成。在 {files} 个 PDF 文件中找到 {matches} 个匹配项。"
+        ),
+    },
+    "zh_hant": {
+        "search_action": "搜尋 PDF",
+        "search_intro": (
+            "無需逐一開啟即可搜尋多個 PDF。將 PDF 檔案或資料夾拖到下方，"
+            "查看相符頁碼和附近文字。"
+        ),
+        "search_warning": "".join(
+            (
+                "只能搜尋可選取的文字。掃描或拍照頁面需要先進行 OCR。",
+                "不會變更任何檔案。",
+            )
+        ),
+        "search_for": "要尋找的文字",
+        "case_sensitive": "嚴格區分大小寫",
+        "search_drop_files": "將 PDF 檔案或資料夾拖放到這裡\n\n或按一下此方塊瀏覽檔案",
+        "search_choose_files": "按一下此處選擇 PDF 檔案",
+        "search_browse_files": "選擇 PDF 檔案",
+        "search_browse_folder": "選擇資料夾",
+        "search_folder_title": "選擇要遞迴搜尋的資料夾",
+        "search_query_required": "請先輸入要尋找的文字。",
+        "searching_files": "正在搜尋 {count} 個 PDF 檔案...",
+        "searching_file": "正在搜尋：{name}",
+        "search_match": "{name} — 第 {page} 頁\n{snippet}",
+        "search_file_summary": "{name}：在 {pages} 頁中找到 {matches} 個相符項目。",
+        "search_no_match": "{name}：找不到相符項目。",
+        "search_no_text": "{name}：找不到可選取的文字；這可能是掃描版 PDF。",
+        "search_truncated": "{name}：為保持回應速度，僅顯示前 {limit} 個相符項目。",
+        "search_finished": (
+            "搜尋完成。在 {files} 個 PDF 檔案中找到 {matches} 個相符項目。"
+        ),
+    },
+    "es": {
+        "search_action": "Buscar en PDF",
+        "search_intro": (
+            "Busca en muchos PDF sin abrirlos uno por uno. Arrastra archivos o "
+            "una carpeta para ver la página y el texto cercano."
+        ),
+        "search_warning": (
+            "Solo se busca texto seleccionable. Las páginas escaneadas necesitan "
+            "OCR. No se modifica ningún archivo."
+        ),
+        "search_for": "Texto que buscar",
+        "case_sensitive": "Distinguir exactamente mayúsculas y minúsculas",
+        "search_drop_files": "\n\n".join(
+            ("ARRASTRA PDF O UNA CARPETA AQUÍ", "o haz clic para elegir archivos")
+        ),
+        "search_choose_files": "HAZ CLIC AQUÍ PARA ELEGIR PDF",
+        "search_browse_files": "Elegir archivos PDF",
+        "search_browse_folder": "Elegir carpeta",
+        "search_folder_title": "Elige una carpeta para buscar recursivamente",
+        "search_query_required": "Escribe primero el texto que quieres buscar.",
+        "searching_files": "BUSCANDO EN {count} ARCHIVO(S) PDF...",
+        "searching_file": "Buscando: {name}",
+        "search_match": "{name} — página {page}\n{snippet}",
+        "search_file_summary": (
+            "{name}: {matches} coincidencia(s) en {pages} página(s)."
+        ),
+        "search_no_match": "{name}: sin coincidencias.",
+        "search_no_text": (
+            "{name}: no hay texto seleccionable; puede ser un PDF escaneado."
+        ),
+        "search_truncated": "{name}: se muestran las primeras {limit} coincidencias.",
+        "search_finished": (
+            "Búsqueda terminada. {matches} coincidencia(s) en {files} PDF."
+        ),
+    },
+    "ja": {
+        "search_action": "PDF を検索",
+        "search_intro": (
+            "PDF を個別に開かず、まとめて検索できます。PDF またはフォルダーを"
+            "下にドロップすると、該当ページと周辺の文章を表示します。"
+        ),
+        "search_warning": (
+            "選択可能なテキストのみ検索します。スキャン画像には事前に OCR が"
+            "必要です。ファイルは変更しません。"
+        ),
+        "search_for": "検索するテキスト",
+        "case_sensitive": "大文字と小文字を区別",
+        "search_drop_files": "\n\n".join(
+            (
+                "PDF またはフォルダーをここにドロップ",
+                "またはクリックしてファイルを選択",
+            )
+        ),
+        "search_choose_files": "ここをクリックして PDF を選択",
+        "search_browse_files": "PDF ファイルを選択",
+        "search_browse_folder": "フォルダーを選択",
+        "search_folder_title": "再帰検索するフォルダーを選択",
+        "search_query_required": "最初に検索するテキストを入力してください。",
+        "searching_files": "{count} 個の PDF を検索中...",
+        "searching_file": "検索中：{name}",
+        "search_match": "{name} — {page} ページ\n{snippet}",
+        "search_file_summary": "{name}：{pages} ページに {matches} 件の一致。",
+        "search_no_match": "{name}：一致なし。",
+        "search_no_text": "{name}：選択可能なテキストなし（スキャン PDF の可能性）。",
+        "search_truncated": "{name}：最初の {limit} 件のみ表示しています。",
+        "search_finished": "検索完了。{files} 個の PDF で {matches} 件見つかりました。",
+    },
+    "ko": {
+        "search_action": "PDF 검색",
+        "search_intro": (
+            "PDF를 하나씩 열지 않고 한꺼번에 검색하세요. PDF 파일이나 폴더를 "
+            "놓으면 일치하는 페이지와 주변 텍스트를 표시합니다."
+        ),
+        "search_warning": (
+            "선택 가능한 텍스트만 검색합니다. 스캔한 페이지는 먼저 OCR이 "
+            "필요합니다. 파일은 변경되지 않습니다."
+        ),
+        "search_for": "찾을 텍스트",
+        "case_sensitive": "대문자와 소문자를 정확히 구분",
+        "search_drop_files": (
+            "PDF 파일 또는 폴더를 여기에 놓으세요\n\n또는 클릭하여 파일 선택"
+        ),
+        "search_choose_files": "여기를 클릭하여 PDF 파일 선택",
+        "search_browse_files": "PDF 파일 선택",
+        "search_browse_folder": "폴더 선택",
+        "search_folder_title": "하위 폴더까지 검색할 폴더 선택",
+        "search_query_required": "먼저 찾을 텍스트를 입력하세요.",
+        "searching_files": "PDF 파일 {count}개 검색 중...",
+        "searching_file": "검색 중: {name}",
+        "search_match": "{name} — {page}페이지\n{snippet}",
+        "search_file_summary": "{name}: {pages}개 페이지에서 {matches}개 일치.",
+        "search_no_match": "{name}: 일치 항목 없음.",
+        "search_no_text": "{name}: 선택 가능한 텍스트 없음(스캔 PDF일 수 있음).",
+        "search_truncated": "{name}: 처음 {limit}개 일치 항목만 표시합니다.",
+        "search_finished": "검색 완료. PDF {files}개에서 {matches}개를 찾았습니다.",
+    },
+}
+for _language, _search_translations in SEARCH_TRANSLATIONS.items():
+    TRANSLATIONS[_language].update(_search_translations)
+
 COMPRESSION_PROFILES = {
     "none": {
         "label": "Unlock only",
@@ -852,6 +1052,21 @@ class ImageCompressionResult:
         if not self.source_size:
             return 0.0
         return (1 - self.output_size / self.source_size) * 100
+
+
+@dataclass(frozen=True)
+class PdfSearchMatch:
+    page_number: int
+    snippet: str
+
+
+@dataclass(frozen=True)
+class PdfSearchResult:
+    source: Path
+    page_count: int
+    searchable_pages: int
+    matches: tuple[PdfSearchMatch, ...]
+    truncated: bool
 
 
 LOCKED_PERMISSIONS = (
@@ -1138,6 +1353,116 @@ def _password_unlocks(reader: PdfReader, password: str) -> bool:
         return bool(reader.decrypt(password))
     except (PdfReadError, TypeError, ValueError):
         return False
+
+
+def collect_pdf_files(inputs: Iterable[str | Path]) -> list[Path]:
+    """Return unique PDF files, recursively expanding selected folders."""
+
+    collected: list[Path] = []
+    seen: set[str] = set()
+    for value in inputs:
+        path = Path(value)
+        candidates = (
+            sorted(
+                (
+                    candidate
+                    for candidate in path.rglob("*")
+                    if candidate.is_file() and candidate.suffix.lower() == ".pdf"
+                ),
+                key=lambda candidate: str(candidate).casefold(),
+            )
+            if path.is_dir()
+            else [path]
+        )
+        for candidate in candidates:
+            if not candidate.is_file() or candidate.suffix.lower() != ".pdf":
+                continue
+            resolved = candidate.resolve()
+            identity = os.path.normcase(str(resolved))
+            if identity not in seen:
+                seen.add(identity)
+                collected.append(resolved)
+    return collected
+
+
+def _normalise_search_text(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _search_snippet(text: str, start: int, end: int, context_chars: int) -> str:
+    left = max(0, start - context_chars)
+    right = min(len(text), end + context_chars)
+    snippet = text[left:right]
+    if left:
+        snippet = f"…{snippet}"
+    if right < len(text):
+        snippet = f"{snippet}…"
+    return snippet
+
+
+def search_pdf(
+    source: str | Path,
+    query: str,
+    *,
+    password: str | None = None,
+    case_sensitive: bool = False,
+    context_chars: int = 100,
+    max_matches: int = 200,
+) -> PdfSearchResult:
+    """Search selectable PDF text and return page-numbered context snippets."""
+
+    source_path = Path(source).resolve()
+    if not source_path.is_file() or source_path.suffix.lower() != ".pdf":
+        raise ValueError(f"Not a PDF file: {source_path}")
+    normalised_query = _normalise_search_text(query)
+    if not normalised_query:
+        raise ValueError("Search text cannot be empty.")
+    if context_chars < 0:
+        raise ValueError("context_chars cannot be negative.")
+    if max_matches < 1:
+        raise ValueError("max_matches must be at least 1.")
+
+    reader, _ = _open_reader(source_path, password)
+    flags = 0 if case_sensitive else re.IGNORECASE
+    pattern = re.compile(re.escape(normalised_query), flags)
+    matches: list[PdfSearchMatch] = []
+    searchable_pages = 0
+    truncated = False
+
+    for page_number, page in enumerate(reader.pages, start=1):
+        try:
+            page_text = page.extract_text() or ""
+        except (PdfReadError, TypeError, ValueError, KeyError):
+            page_text = ""
+        normalised_text = _normalise_search_text(page_text)
+        if not normalised_text:
+            continue
+        searchable_pages += 1
+        for occurrence in pattern.finditer(normalised_text):
+            if len(matches) >= max_matches:
+                truncated = True
+                break
+            matches.append(
+                PdfSearchMatch(
+                    page_number=page_number,
+                    snippet=_search_snippet(
+                        normalised_text,
+                        occurrence.start(),
+                        occurrence.end(),
+                        context_chars,
+                    ),
+                )
+            )
+        if truncated:
+            break
+
+    return PdfSearchResult(
+        source=source_path,
+        page_count=len(reader.pages),
+        searchable_pages=searchable_pages,
+        matches=tuple(matches),
+        truncated=truncated,
+    )
 
 
 def _compress_page_content(page) -> bool:
@@ -1958,6 +2283,8 @@ def run_gui() -> int:
     action_mode = tk.StringVar(value="unlock")
     compression_enabled = tk.BooleanVar(value=False)
     compression_level = tk.StringVar(value="standard")
+    search_query = tk.StringVar()
+    search_case_sensitive = tk.BooleanVar(value=False)
     options = ttk.LabelFrame(outer, text=tr("processing_option"), padding=10)
     options.pack(fill="x", pady=(0, 14))
 
@@ -1986,7 +2313,30 @@ def run_gui() -> int:
         value="image",
         command=lambda: update_compression_controls(),
     )
-    image_radio.pack(anchor="w", padx=(22, 0), pady=(2, 8))
+    image_radio.pack(anchor="w", padx=(22, 0), pady=2)
+    search_radio = ttk.Radiobutton(
+        options,
+        text=tr("search_action"),
+        variable=action_mode,
+        value="search",
+        command=lambda: update_compression_controls(),
+    )
+    search_radio.pack(anchor="w", padx=(22, 0), pady=(2, 8))
+
+    search_frame = ttk.Frame(options)
+    search_label = ttk.Label(search_frame, text=tr("search_for"))
+    search_label.pack(anchor="w")
+    search_entry = ttk.Entry(
+        search_frame,
+        textvariable=search_query,
+    )
+    search_entry.pack(fill="x", pady=(4, 5))
+    search_case_check = ttk.Checkbutton(
+        search_frame,
+        text=tr("case_sensitive"),
+        variable=search_case_sensitive,
+    )
+    search_case_check.pack(anchor="w")
 
     compression_check = ttk.Checkbutton(
         options,
@@ -2035,9 +2385,30 @@ def run_gui() -> int:
         selected_action = action_mode.get()
         unlocking = selected_action == "unlock"
         compressing_images = selected_action == "image"
+        searching = selected_action == "search"
+        compression_widgets = (
+            compression_check,
+            standard_radio,
+            major_radio,
+            massive_radio,
+            quality_label,
+        )
+        if searching:
+            for widget in compression_widgets:
+                widget.pack_forget()
+            if not search_frame.winfo_manager():
+                search_frame.pack(fill="x", pady=(2, 0), after=search_radio)
+            search_entry.focus_set()
+        else:
+            search_frame.pack_forget()
+            if not standard_radio.winfo_manager():
+                standard_radio.pack(anchor="w", padx=(22, 0), pady=2)
+                major_radio.pack(anchor="w", padx=(22, 0), pady=2)
+                massive_radio.pack(anchor="w", padx=(22, 0), pady=2)
+                quality_label.pack(anchor="w", pady=(5, 0))
         if compressing_images:
             compression_check.pack_forget()
-        else:
+        elif not searching:
             if not compression_check.winfo_manager():
                 compression_check.pack(
                     anchor="w",
@@ -2051,9 +2422,10 @@ def run_gui() -> int:
             if compressing_images or (unlocking and compression_enabled.get())
             else "disabled"
         )
-        standard_radio.configure(state=state)
-        major_radio.configure(state=state)
-        massive_radio.configure(state=state)
+        if not searching:
+            standard_radio.configure(state=state)
+            major_radio.configure(state=state)
+            massive_radio.configure(state=state)
         if compressing_images:
             standard_radio.configure(text=tr("image_standard_compression"))
             major_radio.configure(text=tr("image_maximum_compression"))
@@ -2063,7 +2435,7 @@ def run_gui() -> int:
                 "major": "image_major_quality",
                 "massive": "image_massive_quality",
             }[compression_level.get()]
-        else:
+        elif not searching:
             standard_radio.configure(text=tr("standard_compression"))
             major_radio.configure(text=tr("maximum_compression"))
             massive_radio.configure(text=tr("massive_compression"))
@@ -2072,26 +2444,41 @@ def run_gui() -> int:
                 if compression_enabled.get() and compression_level.get() == "massive"
                 else "no_quality_removed"
             )
-        quality_label.configure(text=tr(warning_key))
+        if not searching:
+            quality_label.configure(text=tr(warning_key))
         intro_key = {
             "unlock": "intro",
             "lock": "lock_intro",
             "image": "image_intro",
+            "search": "search_intro",
         }[selected_action]
         warning_text_key = {
             "unlock": "warning",
             "lock": "lock_warning",
             "image": "image_warning",
+            "search": "search_warning",
         }[selected_action]
         intro_label.configure(text=tr(intro_key))
         warning_label.configure(text=tr(warning_text_key))
         if "drop_zone" in dynamic_widgets:
             dynamic_widgets["drop_zone"].configure(text=current_drop_text())
             dynamic_widgets["choose_button"].configure(text=current_browse_text())
+            folder_button = dynamic_widgets["folder_button"]
+            if searching:
+                if not folder_button.winfo_manager():
+                    folder_button.pack(side="left", padx=(8, 0))
+            else:
+                folder_button.pack_forget()
 
     update_compression_controls()
 
     def current_drop_text() -> str:
+        if action_mode.get() == "search":
+            return tr(
+                "search_drop_files"
+                if drag_and_drop_available
+                else "search_choose_files"
+            )
         if action_mode.get() == "image":
             return tr(
                 "image_drop_files" if drag_and_drop_available else "image_choose_files"
@@ -2099,9 +2486,11 @@ def run_gui() -> int:
         return tr("drop_files") if drag_and_drop_available else tr("choose_files")
 
     def current_browse_text() -> str:
-        return tr(
-            "image_browse_files" if action_mode.get() == "image" else "browse_files"
-        )
+        if action_mode.get() == "image":
+            return tr("image_browse_files")
+        if action_mode.get() == "search":
+            return tr("search_browse_files")
+        return tr("browse_files")
 
     drop_zone = tk.Label(
         outer,
@@ -2194,23 +2583,35 @@ def run_gui() -> int:
 
     def process_files(filenames) -> None:
         selected_action = action_mode.get()
-        input_files = []
-        for filename in filenames:
-            path = Path(filename)
-            valid_file = path.is_file() and (
-                path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS
-                if selected_action == "image"
-                else path.suffix.lower() == ".pdf"
+        if selected_action == "search" and not search_query.get().strip():
+            messagebox.showwarning(
+                APP_NAME,
+                tr("search_query_required"),
+                parent=root,
             )
-            if valid_file:
-                input_files.append(path)
-            else:
-                skipped_key = (
-                    "skipped_not_image"
+            search_entry.focus_set()
+            return
+
+        input_files = (
+            collect_pdf_files(filenames) if selected_action == "search" else []
+        )
+        if selected_action != "search":
+            for filename in filenames:
+                path = Path(filename)
+                valid_file = path.is_file() and (
+                    path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS
                     if selected_action == "image"
-                    else "skipped_not_pdf"
+                    else path.suffix.lower() == ".pdf"
                 )
-                append_log(tr(skipped_key, name=path.name or path))
+                if valid_file:
+                    input_files.append(path)
+                else:
+                    skipped_key = (
+                        "skipped_not_image"
+                        if selected_action == "image"
+                        else "skipped_not_pdf"
+                    )
+                    append_log(tr(skipped_key, name=path.name or path))
 
         if not input_files:
             messagebox.showwarning(
@@ -2259,11 +2660,16 @@ def run_gui() -> int:
                 )
                 return
         choose_button.configure(state="disabled")
+        folder_button.configure(state="disabled")
         drop_zone.configure(
             text=tr(
                 "processing_images"
                 if selected_action == "image"
-                else "processing_files",
+                else (
+                    "searching_files"
+                    if selected_action == "search"
+                    else "processing_files"
+                ),
                 count=len(input_files),
             ),
             cursor="watch",
@@ -2271,15 +2677,29 @@ def run_gui() -> int:
         )
         successes = 0
         failures = []
+        total_matches = 0
 
         try:
             for source in input_files:
-                append_log(tr("processing_file", name=source.name))
+                append_log(
+                    tr(
+                        "searching_file"
+                        if selected_action == "search"
+                        else "processing_file",
+                        name=source.name,
+                    )
+                )
                 try:
                     if selected_action == "image":
                         result = compress_image(source, compression=selected_mode)
                     elif selected_action == "lock":
                         result = lock_pdf(source, new_password or "")
+                    elif selected_action == "search":
+                        result = search_pdf(
+                            source,
+                            search_query.get(),
+                            case_sensitive=search_case_sensitive.get(),
+                        )
                     else:
                         result = unlock_pdf(source, compression=selected_mode)
                 except PasswordRequiredError:
@@ -2300,6 +2720,13 @@ def run_gui() -> int:
                                 new_password or "",
                                 source_password=password,
                             )
+                        elif selected_action == "search":
+                            result = search_pdf(
+                                source,
+                                search_query.get(),
+                                password=password,
+                                case_sensitive=search_case_sensitive.get(),
+                            )
                         else:
                             result = unlock_pdf(
                                 source,
@@ -2316,7 +2743,43 @@ def run_gui() -> int:
                     continue
 
                 successes += 1
-                if isinstance(result, ImageCompressionResult):
+                if isinstance(result, PdfSearchResult):
+                    display_source = str(result.source)
+                    total_matches += len(result.matches)
+                    if result.searchable_pages == 0:
+                        append_log(tr("search_no_text", name=display_source))
+                    elif not result.matches:
+                        append_log(tr("search_no_match", name=display_source))
+                    else:
+                        for match in result.matches:
+                            append_log(
+                                tr(
+                                    "search_match",
+                                    name=display_source,
+                                    page=match.page_number,
+                                    snippet=match.snippet,
+                                )
+                            )
+                        matched_pages = len(
+                            {match.page_number for match in result.matches}
+                        )
+                        append_log(
+                            tr(
+                                "search_file_summary",
+                                name=display_source,
+                                matches=len(result.matches),
+                                pages=matched_pages,
+                            )
+                        )
+                    if result.truncated:
+                        append_log(
+                            tr(
+                                "search_truncated",
+                                name=display_source,
+                                limit=len(result.matches),
+                            )
+                        )
+                elif isinstance(result, ImageCompressionResult):
                     append_log(format_gui_image_result(result))
                 elif isinstance(result, LockResult):
                     append_log(format_gui_lock_result(result))
@@ -2324,6 +2787,7 @@ def run_gui() -> int:
                     append_log(format_gui_result(result))
         finally:
             choose_button.configure(state="normal")
+            folder_button.configure(state="normal")
             drop_zone.configure(
                 text=current_drop_text(),
                 cursor="hand2",
@@ -2344,9 +2808,17 @@ def run_gui() -> int:
         else:
             messagebox.showinfo(
                 APP_NAME,
-                tr(
-                    "finished_images" if selected_action == "image" else "finished",
-                    successes=successes,
+                (
+                    tr(
+                        "search_finished",
+                        matches=total_matches,
+                        files=successes,
+                    )
+                    if selected_action == "search"
+                    else tr(
+                        "finished_images" if selected_action == "image" else "finished",
+                        successes=successes,
+                    )
                 ),
                 parent=root,
             )
@@ -2371,6 +2843,15 @@ def run_gui() -> int:
         )
         if filenames:
             process_files(filenames)
+
+    def select_search_folder() -> None:
+        folder = filedialog.askdirectory(
+            parent=root,
+            title=tr("search_folder_title"),
+            mustexist=True,
+        )
+        if folder:
+            process_files((folder,))
 
     def handle_drop(event) -> None:
         filenames = root.tk.splitlist(event.data)
@@ -2432,6 +2913,12 @@ def run_gui() -> int:
     )
     choose_button.pack(side="left")
     dynamic_widgets["choose_button"] = choose_button
+    folder_button = ttk.Button(
+        button_row,
+        text=tr("search_browse_folder"),
+        command=select_search_folder,
+    )
+    dynamic_widgets["folder_button"] = folder_button
     close_button = ttk.Button(
         button_row,
         text=tr("close"),
@@ -2463,10 +2950,14 @@ def run_gui() -> int:
         unlock_radio.configure(text=tr("unlock_action"))
         lock_radio.configure(text=tr("lock_action"))
         image_radio.configure(text=tr("image_action"))
+        search_radio.configure(text=tr("search_action"))
+        search_label.configure(text=tr("search_for"))
+        search_case_check.configure(text=tr("case_sensitive"))
         compression_check.configure(text=tr("compress_after_unlocking"))
         update_compression_controls()
         drop_zone.configure(text=current_drop_text())
         choose_button.configure(text=current_browse_text())
+        folder_button.configure(text=tr("search_browse_folder"))
         about_button.configure(text=tr("about"))
         close_button.configure(text=tr("close"))
         try:
@@ -2490,7 +2981,8 @@ def run_gui() -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Unlock, protect, or compress local files without modifying the sources."
+            "Unlock, protect, compress, or search local files without "
+            "modifying sources."
         )
     )
     parser.add_argument("files", nargs="*", help="PDF or picture files to process")
@@ -2526,6 +3018,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Compress JPEG, PNG, WebP, GIF, BMP, or TIFF picture files",
     )
     parser.add_argument(
+        "--search",
+        metavar="TEXT",
+        help="Search selectable text in PDF files or folders without changing them",
+    )
+    parser.add_argument(
+        "--case-sensitive",
+        action="store_true",
+        help="Make --search distinguish uppercase and lowercase",
+    )
+    parser.add_argument(
         "--compression",
         choices=("none", "standard", "major", "massive"),
         default="none",
@@ -2544,7 +3046,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.gui or not args.files:
+    search_requested = args.search is not None
+    if args.gui:
+        return run_gui()
+    if not args.files:
+        if search_requested:
+            raise SystemExit("--search requires at least one PDF file or folder.")
         return run_gui()
     if args.output and len(args.files) != 1:
         raise SystemExit("--output can only be used with one input file.")
@@ -2552,6 +3059,14 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--lock-password requires --lock.")
     if args.lock and args.compress_images:
         raise SystemExit("--lock cannot be used with --compress-images.")
+    if search_requested and (args.lock or args.compress_images):
+        raise SystemExit("--search cannot be used with --lock or --compress-images.")
+    if args.case_sensitive and not search_requested:
+        raise SystemExit("--case-sensitive requires --search.")
+    if search_requested and (args.output or args.overwrite):
+        raise SystemExit("--output and --overwrite cannot be used with --search.")
+    if search_requested and args.compression != "none":
+        raise SystemExit("--compression cannot be used with --search.")
     if args.lock and args.compression != "none":
         raise SystemExit("--compression cannot be used with --lock.")
     if args.password and args.compress_images:
@@ -2567,9 +3082,36 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("The new password must contain at least 8 characters.")
 
     exit_code = 0
-    for filename in args.files:
+    filenames = collect_pdf_files(args.files) if search_requested else args.files
+    if search_requested and not filenames:
+        print("No PDF files were found.", file=sys.stderr)
+        return 1
+    for filename in filenames:
         try:
-            if args.compress_images:
+            if search_requested:
+                search_result = search_pdf(
+                    filename,
+                    args.search or "",
+                    password=args.password,
+                    case_sensitive=args.case_sensitive,
+                )
+                for match in search_result.matches:
+                    print(
+                        f"{search_result.source} — page {match.page_number}\n"
+                        f"{match.snippet}\n"
+                    )
+                matched_pages = len(
+                    {match.page_number for match in search_result.matches}
+                )
+                print(
+                    f"{search_result.source}: {len(search_result.matches)} match(es) "
+                    f"on {matched_pages} page(s)."
+                )
+                if search_result.searchable_pages == 0:
+                    print("No selectable text found; this may be a scanned PDF.")
+                if search_result.truncated:
+                    print("Showing the first 200 matches.")
+            elif args.compress_images:
                 image_compression = (
                     "standard" if args.compression == "none" else args.compression
                 )
