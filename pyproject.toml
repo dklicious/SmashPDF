@@ -12,7 +12,7 @@ license = "MIT"
 authors = [{ name = "dklicious" }]
 dependencies = [
   "pillow==12.3.0",
-  "pypdf[crypto]==6.15.0",
+  "pypdf[crypto]==6.17.0",
   "tkinterdnd2==0.6.2",
 ]
 
